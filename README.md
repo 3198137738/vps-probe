@@ -1,6 +1,6 @@
 # 云监控探针
 
-轻量级 VPS 探针，界面仿经典 ServerStatus 风格。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
+轻量级 VPS 探针，前端采用 [ServerStatus 1.0.9](https://github.com/cppla/ServerStatus/tree/1.0.9)（cppla，MIT 许可）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
 
 监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点行可展开详情（内存/虚存、硬盘/读写、TCP/UDP/进程/线程、三网延迟）。
 
@@ -84,14 +84,14 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 - 按默认 3 秒间隔，上报流量约 **200MB/月**；改为 `interval: 5` 约 120MB/月，`10` 约 60MB/月
 - 三网探测每 60 秒 3 次 TCP 握手，约 40MB/月
 - 国家/协议栈识别每 6 小时一次
-- 网页接口 gzip 压缩，浏览器标签页隐藏时自动停止刷新
+- 网页与接口 gzip 压缩，静态资源浏览器缓存 1 小时，标签页隐藏时自动停止刷新
 
 ## 目录结构
 
 ```
 agent/agent.py        客户端
 server/server.py      服务端（TCP 上报 + HTTP 网页）
-server/web/           前端页面
+server/web/           前端页面（ServerStatus 1.0.9，数据接口 /json/stats.json 由服务端转换提供）
 install.sh            客户端一键安装 / 卸载
 install_server.sh     服务端一键安装 / 卸载
 uninstall.sh          一键彻底卸载（客户端 + 服务端）

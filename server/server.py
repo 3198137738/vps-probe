@@ -72,6 +72,7 @@ class Store:
         self.conns = {}   # id -> 当前连接对象
         self.dirty = False
         self.cache = (0, b"", b"")
+        self.ss_cache = (0, b"", b"")
         try:
             with open(NODES_FILE, encoding="utf-8") as f:
                 for nid, n in json.load(f).items():
@@ -157,6 +158,50 @@ class Store:
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         gz = gzip.compress(body, 6)
         self.cache = (now, body, gz)
+        return body, gz
+
+    def ss_stats(self):
+        """转换为 ServerStatus 1.0.9 前端使用的 json/stats.json 格式，1 秒内复用缓存"""
+        now = time.time()
+        if now - self.ss_cache[0] < 1:
+            return self.ss_cache[1], self.ss_cache[2]
+        timeout = CFG["offline_timeout"]
+        servers = []
+        with self.lock:
+            items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+            for _, n in items:
+                s, d = n["s"], n["d"]
+                if not s:
+                    continue
+                online = bool(d) and now - n["t"] < timeout
+                d = d or [0] * 24
+                proto = s[3] if online else ""
+                up = int(d[17])
+                days = up // 86400
+                servers.append({
+                    "name": s[0], "type": s[1], "host": s[0], "location": s[2],
+                    "online4": online and ("4" in proto or not proto),
+                    "online6": online and "6" in proto,
+                    "uptime": "%d 天" % days if days > 0 else
+                              "%02d:%02d:%02d" % (up // 3600, up // 60 % 60, up % 60),
+                    "load_1": d[1], "load_5": d[1], "load_15": d[1],
+                    "ping_10010": d[19], "ping_189": d[21], "ping_10086": d[23],
+                    "time_10010": max(d[18], 0), "time_189": max(d[20], 0), "time_10086": max(d[22], 0),
+                    "tcp_count": d[13], "udp_count": d[14], "process_count": d[15], "thread_count": d[16],
+                    "network_rx": d[2], "network_tx": d[3],
+                    "network_in": d[4], "network_out": d[5],
+                    # 前端用 network_in - last_network_in 计算月流量
+                    "last_network_in": d[4] - d[6], "last_network_out": d[5] - d[7],
+                    "cpu": int(round(d[0])),
+                    "memory_total": s[5] // 1024, "memory_used": d[8] // 1024,       # KB
+                    "swap_total": s[6] // 1024, "swap_used": d[9] // 1024,           # KB
+                    "hdd_total": s[7] // 1048576, "hdd_used": d[10] // 1048576,      # MB
+                    "io_read": d[11], "io_write": d[12], "custom": "",
+                })
+        body = json.dumps({"servers": servers, "updated": str(int(now))},
+                          ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        gz = gzip.compress(body, 6)
+        self.ss_cache = (now, body, gz)
         return body, gz
 
 
@@ -262,6 +307,9 @@ class WebHandler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path == "/api/stats":
             body, gz = STORE.stats()
+            return self.send(200, body, gz=gz)
+        if url.path == "/json/stats.json":
+            body, gz = STORE.ss_stats()
             return self.send(200, body, gz=gz)
         path = "/index.html" if url.path == "/" else url.path
         full = os.path.realpath(os.path.join(WEB_DIR, path.lstrip("/")))

@@ -44,10 +44,17 @@ download() {
 }
 
 green "正在下载服务端 ..."
-mkdir -p "$DIR/web"
+rm -rf "$DIR/web"
+mkdir -p "$DIR/web/css" "$DIR/web/js" "$DIR/web/img"
 RAW="${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/server"
 download "$RAW/server.py" "$DIR/server.py"
-for f in index.html style.css app.js; do download "$RAW/web/$f" "$DIR/web/$f"; done
+# 前端：ServerStatus 1.0.9（cppla/ServerStatus，MIT）
+for f in index.html favicon.ico \
+         css/bootstrap.min.css css/bootstrap-theme.min.css css/light.css css/dark.css \
+         js/jquery.min.js js/bootstrap.min.js js/serverstatus.js js/html5shiv.js js/respond.min.js \
+         img/light.png img/dark.png; do
+  download "$RAW/web/$f" "$DIR/web/$f"
+done
 
 PY="$(command -v python3)"
 
