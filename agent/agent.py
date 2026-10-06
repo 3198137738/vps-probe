@@ -352,7 +352,8 @@ class Pinger:
             threading.Thread(target=self.loop, daemon=True).start()
 
     @staticmethod
-    def tcping(target, timeout=2):
+    def tcping(target, timeout=1):
+        # 超时取 1 秒：系统会在 1 秒后重发丢失的 SYN，超时过长会把丢包误判为高延迟
         host, _, port = target.rpartition(":")
         host = host.strip("[]")
         try:
