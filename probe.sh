@@ -175,7 +175,7 @@ def ago(t):
     return "%d 天前" % (sec // 86400)
 
 
-if cmd in ("table", "ids", "summary"):
+if cmd in ("table", "ids", "summary", "old"):
     r = call("list")
     if not r.get("ok"):
         if cmd == "table":
@@ -184,6 +184,11 @@ if cmd in ("table", "ids", "summary"):
     nodes = r["nodes"]
     if cmd == "summary":
         print("%d/%d" % (sum(1 for n in nodes if n["online"]), len(nodes)))
+    elif cmd == "old":
+        # 在线但客户端不是最新版的节点：id、名称、IP
+        for n in nodes:
+            if n["online"] and not n.get("latest"):
+                print("%s\t%s\t%s" % (n["id"], n["name"], n["ip"]))
     elif cmd == "ids":
         for n in nodes:
             print("%s\t%s" % (n["id"], n["name"]))
@@ -202,7 +207,7 @@ if cmd in ("table", "ids", "summary"):
             print("\033[%sm%s\033[0m" % (color, line))
         if any(n["online"] and not n.get("latest") for n in nodes):
             print("\n\033[33m提示：在线但显示「旧版」的节点通常会在重连时自动更新；若长时间仍为旧版，"
-                  "说明其客户端过旧不支持自动更新，请在「添加节点」中对该 VPS 重新安装一次（节点 ID 不变）\033[0m")
+                  "说明其客户端过旧不支持自动更新，请使用主菜单「7. 批量更新旧版客户端」（节点 ID 不变）\033[0m")
 else:
     kw = dict(a.split("=", 1) for a in args)
     r = call(cmd, **kw)
@@ -410,25 +415,77 @@ add_local() {
   rm -f "$tmp"
 }
 
-add_ssh() {
-  command -v ssh >/dev/null 2>&1 || { red "未找到 ssh 命令，请先安装 openssh-client"; return 1; }
-  local host sport user name tmp args envs sudo=""
-  host="$(ask "VPS 的 IP 或域名: ")"; [ -n "$host" ] || return 1
-  sport="$(ask "SSH 端口: " 22)"
-  user="$(ask "SSH 用户: " root)"
-  name="$(ask "服务器名称: ")"; [ -n "$name" ] || { red "名称不能为空"; return 1; }
-  tmp="$(mktemp)"
-  download "$(raw "$(latest_sha || echo "$BRANCH")/install.sh")" "$tmp" || { red "下载 install.sh 失败"; rm -f "$tmp"; return 1; }
+# 下载最新 install.sh 到临时文件，输出文件路径
+fetch_installer() {
+  local tmp; tmp="$(mktemp)"
+  if download "$(raw "$(latest_sha || echo "$BRANCH")/install.sh")" "$tmp"; then printf '%s' "$tmp"
+  else red "下载 install.sh 失败" >&2; rm -f "$tmp"; return 1; fi
+}
+
+# ssh_install 主机 SSH端口 用户 名称 install.sh路径：通过 SSH 在远程 VPS 上安装/重装客户端
+ssh_install() {
+  local host="$1" sport="$2" user="$3" name="$4" tmp="$5" args envs sudo=""
   args="$(printf '%q ' -s "$(public_host)" -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name")"
   envs="$(printf 'PROBE_REPO=%q PROBE_BRANCH=%q GH_PROXY=%q' "$REPO" "$BRANCH" "$(proxy)")"
   [ "$user" = "root" ] || sudo="sudo"
   blue "正在通过 SSH 连接 $user@$host:$sport（按提示输入密码）..."
-  if ssh -o StrictHostKeyChecking=accept-new -p "$sport" "$user@$host" "$sudo env $envs bash -s -- $args" < "$tmp"; then
+  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -p "$sport" "$user@$host" \
+    "$sudo env $envs bash -s -- $args" < "$tmp"
+}
+
+add_ssh() {
+  command -v ssh >/dev/null 2>&1 || { red "未找到 ssh 命令，请先安装 openssh-client"; return 1; }
+  local host sport user name tmp
+  host="$(ask "VPS 的 IP 或域名: ")"; [ -n "$host" ] || return 1
+  sport="$(ask "SSH 端口: " 22)"
+  user="$(ask "SSH 用户: " root)"
+  name="$(ask "服务器名称: ")"; [ -n "$name" ] || { red "名称不能为空"; return 1; }
+  tmp="$(fetch_installer)" || return 1
+  if ssh_install "$host" "$sport" "$user" "$name" "$tmp"; then
     green "远程安装完成，节点「$name」稍后出现在列表中"
   else
     red "远程安装失败（非 root 用户需要免密 sudo）"
   fi
   rm -f "$tmp"
+}
+
+# 批量更新旧版客户端：主控本机直接更新，其它节点通过 SSH 重装（节点 ID、名称、流量统计均保留）
+update_old_agents() {
+  need_installed || return 1
+  local lines l id name ip sport user tmp ok=0 fail=0 failed=""
+  mapfile -t lines < <(pyapi old)
+  if [ "${#lines[@]}" -eq 0 ]; then
+    green "所有在线节点的客户端都已是最新版"
+    return 0
+  fi
+  echo "以下节点为旧版客户端（不支持自动更新），需要重装一次，之后即可自动更新："
+  for l in "${lines[@]}"; do
+    IFS=$'\t' read -r id name ip <<<"$l"
+    echo "  - $name（$ip）"
+  done
+  echo "节点 ID、名称、流量统计均会保留。"
+  confirm "开始更新？" || { echo "已取消"; return 0; }
+  echo "其它节点将通过 SSH 更新，以下设置用于所有节点（不同的节点会在失败后列出，可单独处理）"
+  sport="$(ask "SSH 端口: " 22)"
+  user="$(ask "SSH 用户: " root)"
+  tmp="$(fetch_installer)" || return 1
+  for l in "${lines[@]}"; do
+    IFS=$'\t' read -r id name ip <<<"$l"
+    echo
+    blue "==== 更新「$name」($ip) ===="
+    if [ "$ip" = "127.0.0.1" ] || [ "$ip" = "::1" ] || [ "$ip" = "$(public_host)" ]; then
+      PROBE_REPO="$REPO" PROBE_BRANCH="$BRANCH" GH_PROXY="$(proxy)" \
+        bash "$tmp" -s 127.0.0.1 -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name"
+    else
+      ssh_install "$ip" "$sport" "$user" "$name" "$tmp"
+    fi
+    if [ $? -eq 0 ]; then ok=$((ok + 1)); else fail=$((fail + 1)); failed="$failed $name($ip)"; fi
+  done
+  rm -f "$tmp"
+  echo
+  green "更新完成：成功 $ok 个，失败 $fail 个"
+  [ "$fail" -gt 0 ] && yellow "失败的节点：$failed —— 可在「添加节点 → SSH 远程安装」中用正确的端口/用户单独重装"
+  echo "稍等片刻后在「查看节点」中确认客户端列显示为「最新」"
 }
 
 menu_add() {
@@ -633,12 +690,13 @@ main_menu() {
     echo "  4. 添加节点"
     echo "  5. 删除节点"
     echo "  6. 编辑节点（改名 / 排序）"
+    echo "  7. 批量更新旧版客户端"
     echo " ------------------ 管理 ------------------"
-    echo "  7. 查看 Token 与添加命令"
-    echo "  8. 修改设置"
-    echo "  9. 启动 / 停止 / 重启主控"
-    echo " 10. 查看日志"
-    echo " 11. 卸载"
+    echo "  8. 查看 Token 与添加命令"
+    echo "  9. 修改设置"
+    echo " 10. 启动 / 停止 / 重启主控"
+    echo " 11. 查看日志"
+    echo " 12. 卸载"
     echo "  0. 退出"
     case "$(ask "请选择: ")" in
       1) do_install ;;
@@ -647,11 +705,12 @@ main_menu() {
       4) menu_add ;;
       5) menu_delete ;;
       6) menu_edit ;;
-      7) show_info ;;
-      8) menu_settings ;;
-      9) menu_service ;;
-      10) menu_logs ;;
-      11) menu_uninstall ;;
+      7) update_old_agents ;;
+      8) show_info ;;
+      9) menu_settings ;;
+      10) menu_service ;;
+      11) menu_logs ;;
+      12) menu_uninstall ;;
       0|q) exit 0 ;;
       *) continue ;;
     esac
@@ -669,6 +728,7 @@ usage() {
   add          添加节点
   del          删除节点
   edit         编辑节点
+  upgrade      批量更新旧版客户端
   info         查看 Token 与添加命令
   set          修改设置
   restart      重启主控
@@ -686,6 +746,7 @@ case "$1" in
   add) menu_add ;;
   del|delete) menu_delete ;;
   edit) menu_edit ;;
+  upgrade) update_old_agents ;;
   info) show_info ;;
   set|settings) menu_settings ;;
   restart) need_installed && restart_server ;;

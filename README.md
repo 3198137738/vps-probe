@@ -32,16 +32,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/pr
   4. 添加节点            ← SSH 远程安装 / 显示一键命令 / 监控本机
   5. 删除节点            ← VPS 上的客户端会自动卸载
   6. 编辑节点（改名 / 排序）
+  7. 批量更新旧版客户端  ← 早期安装、不支持自动更新的节点一键通过 SSH 重装
  ------------------ 管理 ------------------
-  7. 查看 Token 与添加命令
-  8. 修改设置            ← 标题、端口、上报间隔、三网目标、自动更新、GitHub 加速等
-  9. 启动 / 停止 / 重启主控
- 10. 查看日志
- 11. 卸载                ← 可一并让所有节点自动卸载
+  8. 查看 Token 与添加命令
+  9. 修改设置            ← 标题、端口、上报间隔、三网目标、自动更新、GitHub 加速、排序方式等
+ 10. 启动 / 停止 / 重启主控
+ 11. 查看日志
+ 12. 卸载                ← 可一并让所有节点自动卸载
   0. 退出
 ```
 
-也可直接使用子命令：`probe install | update | list | add | del | edit | info | set | restart | logs | uninstall`。
+也可直接使用子命令：`probe install | update | list | add | del | edit | upgrade | info | set | restart | logs | uninstall`。
 
 > 如果 fork 到自己的仓库，请把 `probe.sh`、`install.sh` 中的 `REPO` 默认值改成你的仓库名（或设置环境变量 `PROBE_REPO=用户/仓库`）。国内机器可在命令前加 `GH_PROXY=https://ghproxy.net/`。
 
