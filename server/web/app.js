@@ -52,6 +52,7 @@
   function bar(v) {
     v = Math.max(0, Math.min(100, Math.round(v)));
     var cls = v >= 90 ? ' danger' : v >= 70 ? ' warn' : '';
+    if (v >= 100) cls += ' full';
     return '<div class="progress"><div class="bar' + cls + '" style="width:' + v + '%"></div><span>' + v + '%</span></div>';
   }
   function flag(cc) {
@@ -59,25 +60,26 @@
     return '<img class="flag" loading="lazy" src="https://flagcdn.com/24x18/' + esc(cc) + '.png" ' +
       'alt="' + esc(cc) + '" title="' + esc(cc.toUpperCase()) + '" onerror="this.outerHTML=\'' + esc(cc) + '\'">';
   }
+  // 三网分隔用的小电脑图标（内联 SVG，不额外请求）
+  var PC = '<svg class="pc" viewBox="0 0 13 11"><rect x="1.5" y=".5" width="10" height="7" rx="1" fill="#222"/>' +
+    '<rect x="2.5" y="1.5" width="8" height="5" fill="#dfe6ee"/><rect y="8" width="13" height="2.5" rx="1" fill="#222"/></svg>';
   function pingCell(d) {
     var l = [d[19], d[21], d[23]];
-    var red = Math.max.apply(null, l) >= 10;
-    return '<span class="ping' + (red ? ' red' : '') + '">' +
-      l[0] + '%<i>💻</i>' + l[1] + '%<i>💻</i>' + l[2] + '%</span>';
+    var max = Math.max.apply(null, l);
+    var cls = max >= 20 ? 'btn-danger' : max >= 10 ? 'btn-warning' : 'btn-success';
+    return '<span class="btn ' + cls + '">' + l[0] + '%' + PC + l[1] + '%' + PC + l[2] + '%</span>';
   }
   function pingDetail(ms, loss) {
     return (ms < 0 ? '-' : ms + 'ms') + ' (' + loss + '%)';
   }
 
-  function row(n) {
+  function row(n, i) {
     var s = n.s, d = n.d, on = n.on && d;
-    var h = '<tr class="node' + (on ? '' : ' offline') + '" data-id="' + esc(n.id) + '">';
-    h += '<td class="c-proto"><span class="tag' + (on ? '' : ' red') + '">' + (on ? protoText(s[3]) : '离线') + '</span></td>';
-    if (!d) {
-      h += '<td class="c-month"><span class="tag gray">-</span></td>';
-    } else {
-      h += '<td class="c-month"><span class="tag' + (on ? '' : ' gray') + '">' + traffic(d[6]) + ' | ' + traffic(d[7]) + '</span></td>';
-    }
+    var stripe = i % 2 === 0 ? ' odd' : '';
+    var h = '<tr class="node' + stripe + (on ? '' : ' offline') + '" data-id="' + esc(n.id) + '">';
+    h += '<td class="c-proto"><span class="btn ' + (on ? 'btn-success' : 'btn-danger') + '">' + (on ? protoText(s[3]) : '离线') + '</span></td>';
+    h += '<td class="c-month"><span class="btn ' + (on ? 'btn-success' : 'btn-default') + '">' +
+      (d ? traffic(d[6]) + ' | ' + traffic(d[7]) : '-') + '</span></td>';
     h += '<td class="c-name">' + esc(s[0]) + '</td>';
     h += '<td class="c-virt">' + esc(s[1]) + '</td>';
     h += '<td class="c-loc">' + flag(s[2]) + '</td>';
@@ -85,7 +87,7 @@
       h += '<td class="c-up">-</td><td class="c-load">-</td><td class="c-net">-</td>';
       h += '<td class="c-total">' + (d ? traffic(d[4]) + ' | ' + traffic(d[5]) : '-') + '</td>';
       h += '<td class="c-bar">' + bar(0) + '</td><td class="c-bar">' + bar(0) + '</td><td class="c-bar">' + bar(0) + '</td>';
-      h += '<td class="c-ping"><span class="ping gray">-</span></td></tr>';
+      h += '<td class="c-ping"><span class="btn btn-default">-</span></td></tr>';
       return h;
     }
     h += '<td class="c-up">' + uptime(d[17]) + '</td>';
@@ -98,7 +100,7 @@
     h += '<td class="c-ping">' + pingCell(d) + '</td></tr>';
 
     if (expanded[n.id]) {
-      h += '<tr class="detail"><td colspan="13">' +
+      h += '<tr class="detail' + stripe + '"><td colspan="13">' +
         '<div>系统: ' + esc(s[8]) + ' (' + esc(s[9]) + ') | ' + s[4] + ' 核 ' + esc(s[10]) + '</div>' +
         '<div>内存|虚存: ' + size(d[8], 1) + ' / ' + size(s[5], 1) + ' | ' + size(d[9], 1) + ' / ' + size(s[6], 1) + '</div>' +
         '<div>硬盘|读写: ' + size(d[10], 2) + ' / ' + size(s[7], 2) + ' | ' + ioSpeed(d[11]) + ' / ' + ioSpeed(d[12]) + '</div>' +
@@ -119,10 +121,19 @@
     var html = nodes.length ? nodes.map(row).join('') :
       '<tr><td colspan="13" class="loading">暂无节点，请在 VPS 上运行一键脚本添加</td></tr>';
     document.getElementById('tbody').innerHTML = html;
-    var online = nodes.filter(function (n) { return n.on; }).length;
-    document.getElementById('footer').textContent =
-      '在线 ' + online + ' / ' + nodes.length + ' · 更新于 ' + new Date(data.now * 1000).toLocaleTimeString();
+    lastUpdate = Date.now();
+    updateFooter();
   }
+
+  // 底部“最后更新”相对时间
+  var lastUpdate = 0;
+  function updateFooter() {
+    if (!lastUpdate) return;
+    var sec = Math.floor((Date.now() - lastUpdate) / 1000);
+    var t = sec < 10 ? '几秒前' : sec < 60 ? sec + ' 秒前' : Math.floor(sec / 60) + ' 分钟前';
+    document.getElementById('footer').textContent = '最后更新: ' + t + '.';
+  }
+  setInterval(updateFooter, 1000);
 
   // ---------------------------------------------------------- 数据拉取（页面隐藏时暂停，节省流量）
   function load() {
