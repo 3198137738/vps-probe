@@ -206,6 +206,11 @@ class AgentHandler(socketserver.StreamRequestHandler):
                     continue
                 if isinstance(msg, list) and msg and msg[0] in ("s", "d"):
                     STORE.update(nid, msg)
+                elif msg == ["x"]:   # 节点卸载时请求从面板中删除自己
+                    STORE.delete(nid)
+                    STORE.save()
+                    log("节点已注销:", nid[:8], peer)
+                    break
         except Exception:
             pass
         finally:

@@ -18,7 +18,7 @@ VPS-C ──┘
 
 - **主控只装一台**：在其中一台机器上运行 `install_server.sh`，它提供网页面板。
 - **其它 VPS 只装客户端**：运行 `install.sh`，`-s` 指向主控 IP。
-- 不要在每台 VPS 上都运行 `install_server.sh`，否则每台都会变成一个只显示自己的独立面板。已经装错的机器可执行 `bash install_server.sh -u` 卸载服务端，再按下面第 2 步重新添加。
+- 不要在每台 VPS 上都运行 `install_server.sh`，否则每台都会变成一个只显示自己的独立面板。已经装错的机器可用下方「一键卸载」清理干净，再按第 2 步重新添加。
 
 ### 1. 安装服务端（仅主控机）
 
@@ -44,7 +44,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/in
 
 国内机器访问 GitHub 困难时，可在命令前加 `GH_PROXY=https://ghproxy.net/`。
 
-### 删除节点
+### 一键卸载
+
+删除本机与探针有关的**所有文件、服务、进程和开机任务**（客户端、服务端都会清理）：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall.sh)
+```
+
+加 `-y` 跳过确认。本机若是节点，卸载时会自动通知主控把它从面板中删除。
+
+会被清理的内容：`probe-agent` / `probe-server` 服务（systemd、OpenRC）、`/opt/probe-agent`、`/opt/probe-server`（含配置、节点数据、流量统计）、残留进程、crontab 开机任务、安装临时文件。
+
+### 手动删除节点
 
 ```bash
 curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
@@ -82,4 +94,5 @@ server/server.py      服务端（TCP 上报 + HTTP 网页）
 server/web/           前端页面
 install.sh            客户端一键安装 / 卸载
 install_server.sh     服务端一键安装 / 卸载
+uninstall.sh          一键彻底卸载（客户端 + 服务端）
 ```
