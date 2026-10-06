@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>云监控</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container nav-inner">
+    <a class="brand" id="brand" href="/">云监控</a>
+    <a class="nav-link active" href="/">首页</a>
+    <a class="nav-link" href="#" id="nav-service">服务</a>
+    <div class="dropdown">
+      <a class="nav-link" href="#" id="nav-theme">风格 <span class="caret"></span></a>
+      <ul class="dropdown-menu" id="theme-menu">
+        <li><a href="#" data-theme="light">浅色</a></li>
+        <li><a href="#" data-theme="dark">深色</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="panel">
+    <table class="table" id="servers">
+      <thead>
+        <tr>
+          <th class="c-proto">🔗协议</th>
+          <th class="c-month">📊月流量↓|↑</th>
+          <th class="c-name">📌节点</th>
+          <th class="c-virt">🗂️虚拟化</th>
+          <th class="c-loc">🌍位置</th>
+          <th class="c-up">⏱️在线</th>
+          <th class="c-load">负载</th>
+          <th class="c-net">🚦网络↓|↑</th>
+          <th class="c-total">📋总流量↓|↑</th>
+          <th class="c-bar">🎯核芯</th>
+          <th class="c-bar">⚡️内存</th>
+          <th class="c-bar">💾硬盘</th>
+          <th class="c-ping">🌐CU|CT|CM</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="13" class="loading">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="footer" id="footer"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
