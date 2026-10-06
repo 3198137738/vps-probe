@@ -93,8 +93,24 @@ PY
 # cfg_set 键名 值 [类型 str|int|bool|json]
 cfg_set() {
   python3 - "$CONF" "$1" "$2" "${3:-str}" <<'PY'
-import json, sys
-path, key, val, typ = sys.argv[1:]
+import json, os, sys
+
+def clean(s):
+    # 终端输入可能含非 UTF-8 字节：依次按 UTF-8、GBK 解析，仍失败则丢弃无效字节
+    raw = os.fsencode(s)
+    try:
+        return raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        pass
+    text = raw.decode("utf-8", "ignore")
+    if any("\u3400" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" for c in text):
+        return text.strip()                   # 含合法 UTF-8 汉字/韩文：终端为 UTF-8，仅丢弃残缺字节
+    try:
+        return raw.decode("gbk").strip()     # 完全没有合法 UTF-8 中文：按 GBK 终端处理
+    except UnicodeDecodeError:
+        return text.strip()
+
+path, key, val, typ = [clean(x) for x in sys.argv[1:]]
 c = json.load(open(path, encoding="utf-8"))
 if typ == "int":
     val = int(val)
@@ -110,8 +126,24 @@ PY
 # 主控管理接口：pyapi table|ids|summary|<action> [k=v ...]
 pyapi() {
   python3 - "$CONF" "$@" <<'PY'
-import json, sys, time, unicodedata, urllib.parse, urllib.request
-conf, cmd, args = sys.argv[1], sys.argv[2], sys.argv[3:]
+import json, os, sys, time, unicodedata, urllib.parse, urllib.request
+
+def clean(s):
+    # 终端输入可能含非 UTF-8 字节：依次按 UTF-8、GBK 解析，仍失败则丢弃无效字节
+    raw = os.fsencode(s)
+    try:
+        return raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        pass
+    text = raw.decode("utf-8", "ignore")
+    if any("\u3400" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" for c in text):
+        return text.strip()                   # 含合法 UTF-8 汉字/韩文：终端为 UTF-8，仅丢弃残缺字节
+    try:
+        return raw.decode("gbk").strip()     # 完全没有合法 UTF-8 中文：按 GBK 终端处理
+    except UnicodeDecodeError:
+        return text.strip()
+
+conf, cmd, args = sys.argv[1], sys.argv[2], [clean(x) for x in sys.argv[3:]]
 c = json.load(open(conf, encoding="utf-8"))
 
 

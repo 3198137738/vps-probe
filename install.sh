@@ -132,8 +132,27 @@ chmod +x "$DIR/agent.py"
 
 # 写入配置（保留已有节点 ID，避免重装后变成新节点）
 python3 - "$DIR/config.json" "$SERVER" "$PORT" "$TOKEN" "$NAME" "$RESET_DAY" "${RENEW_ID:-0}" <<'EOF'
-import json, sys, uuid
-path, server, port, token, name, reset_day, renew = sys.argv[1:]
+import json, os, sys, uuid
+
+
+def clean(s):
+    """终端输入可能含非 UTF-8 字节（GBK 终端、删改半个汉字等）：依次按 UTF-8、GBK 解析，仍失败则丢弃无效字节"""
+    raw = os.fsencode(s)
+    try:
+        return raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        pass
+    text = raw.decode("utf-8", "ignore")
+    if any("\u3400" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" for c in text):
+        return text.strip()                   # 含合法 UTF-8 汉字/韩文：终端为 UTF-8，仅丢弃残缺字节
+    try:
+        return raw.decode("gbk").strip()     # 完全没有合法 UTF-8 中文：按 GBK 终端处理
+    except UnicodeDecodeError:
+        return text.strip()
+
+
+path, server, port, token, name, reset_day, renew = [clean(x) for x in sys.argv[1:]]
+name = name or os.uname().nodename
 try:
     cfg = json.load(open(path, encoding="utf-8"))
 except Exception:
