@@ -46,20 +46,33 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/pr
 
 > 如果 fork 到自己的仓库，请把 `probe.sh`、`install.sh` 中的 `REPO` 默认值改成你的仓库名（或设置环境变量 `PROBE_REPO=用户/仓库`）。国内机器可在命令前加 `GH_PROXY=https://ghproxy.net/`。
 
-### 添加节点的方式
+### 添加节点的方式（支持 Linux 与 Windows）
 
-- **SSH 远程安装（推荐）**：在菜单中输入 VPS 的 IP、SSH 端口、用户和名称，按提示输入密码即可，无需登录 VPS。非 root 用户需要免密 sudo。
-- **一键命令**：菜单显示命令，复制到 VPS 上执行，按提示输入服务器名称：
+主控提供一个一键安装地址 `http://主控IP:8080/i/TOKEN`，**根据请求来源自动下发 Linux 或 Windows 安装脚本**，主控地址与 Token 已预置，客户端也直接从主控下载（节点无需访问 GitHub）。运行后只需输入服务器名称：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 主控IP -p 35688 -t TOKEN
+# Linux（root 执行）
+curl -fsSL http://主控IP:8080/i/TOKEN | bash
 ```
 
-| `install.sh` 参数 | 说明 |
-| --- | --- |
-| `-n 名称` | 直接指定名称，不再询问 |
-| `-r 日期` | 月流量账单重置日，默认每月 1 日 |
-| `-u` | 卸载客户端 |
+```powershell
+# Windows（右键「以管理员身份运行」PowerShell 执行，Windows 10 / Server 2016 及以上）
+irm http://主控IP:8080/i/TOKEN | iex
+```
+
+`probe` 的「添加节点」会直接显示这两条命令。面板通过 nginx 反代为域名后，可在「修改设置 → 面板网址」中填写域名，命令会改用域名地址。
+
+- **SSH 远程安装（推荐）**：在 `probe` 中输入 IP、SSH 端口、用户和名称，**自动识别 Linux / Windows** 并安装，无需登录服务器。Linux 非 root 用户需要免密 sudo；Windows 需开启 OpenSSH 服务端（Server 2019+ 自带）并使用管理员账户。
+- **指定名称 / 卸载**：
+
+| | Linux | Windows |
+| --- | --- | --- |
+| 指定名称 | `curl -fsSL 地址 \| bash -s -- -n 名称` | `$Name='名称'; irm 地址 \| iex` |
+| 卸载 | `curl -fsSL 地址 \| bash -s -- -u` | `$Uninstall=$true; irm 地址 \| iex` |
+
+Linux 也可直接从 GitHub 安装：`bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 主控IP -p 35688 -t TOKEN`（`-r 日期` 设置月流量重置日）。
+
+**Windows 客户端说明**：PowerShell 实现，无需安装任何软件；以计划任务（SYSTEM）开机运行，异常退出自动重启，同样支持从主控自动更新、被主控删除后自行卸载。安装目录 `C:\ProgramData\probe-agent`（日志 `agent.log`）。Windows 没有平均负载，「负载」列显示处理器队列长度。
 
 ### 在任意机器上彻底卸载
 
@@ -110,11 +123,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 ## 目录结构
 
 ```
-agent/agent.py        客户端
+agent/agent.py        Linux 客户端
+agent/agent.ps1       Windows 客户端（PowerShell）
 server/server.py      服务端（TCP 上报 + HTTP 网页）
 server/web/           前端页面（ServerStatus 1.0.9，数据接口 /json/stats.json 由服务端转换提供）
 probe.sh              主控管理脚本（安装 / 更新 / 节点管理 / 设置 / 卸载）
-install.sh            节点客户端安装 / 卸载（由 probe.sh 远程调用或在 VPS 上执行）
+install.sh            Linux 客户端安装 / 卸载
+install.ps1           Windows 客户端安装 / 卸载
 install_server.sh     兼容旧命令，等同于 probe.sh install
 uninstall.sh          一键彻底卸载（客户端 + 服务端）
 ```

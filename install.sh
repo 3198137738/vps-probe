@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # 探针客户端一键安装脚本
 # 用法：
+#   推荐（主控「添加节点」中显示，参数已预置）：curl -fsSL http://主控:8080/i/TOKEN | bash
+#     指定名称：curl -fsSL http://主控:8080/i/TOKEN | bash -s -- -n 名称      卸载：... | bash -s -- -u
+#   也可直接从 GitHub 运行：
 #   bash <(curl -fsSL https://raw.githubusercontent.com/<用户>/<仓库>/main/install.sh) -s 服务端地址 -t TOKEN [-p 端口] [-n 名称] [-r 账单日]
-#   卸载：bash install.sh -u
 set -e
 
 REPO="${PROBE_REPO:-3198137738/vps-probe}"
@@ -11,7 +13,9 @@ GH_PROXY="${GH_PROXY:-}"            # 国内机器可设置 GH_PROXY=https://ghp
 DIR="/opt/probe-agent"
 SERVICE="probe-agent"
 
-SERVER=""; PORT="35688"; TOKEN=""; NAME=""; RESET_DAY="1"; UNINSTALL=0
+# PRESET_* 由主控安装地址下发脚本时预置；命令行参数优先
+SERVER="${PRESET_SERVER:-}"; PORT="${PRESET_PORT:-35688}"; TOKEN="${PRESET_TOKEN:-}"
+NAME=""; RESET_DAY="1"; UNINSTALL=0
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -64,7 +68,7 @@ if [ -f "$DIR/config.json" ] && command -v python3 >/dev/null 2>&1; then
   getcfg() { python3 -c "import json,sys;print(json.load(open('$DIR/config.json',encoding='utf-8')).get(sys.argv[1],''))" "$1" 2>/dev/null || true; }
   [ -z "$SERVER" ] && SERVER="$(getcfg server)"
   [ -z "$TOKEN" ] && TOKEN="$(getcfg token)"
-  [ "$PORT" = "35688" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
+  [ -z "$PRESET_PORT" ] && [ "$PORT" = "35688" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
 fi
 
 ask() {  # ask 提示 变量名
@@ -139,9 +143,15 @@ download() {
 mkdir -p "$DIR"
 green "正在下载客户端 ..."
 # 按最新提交 SHA 下载，避开 raw.githubusercontent.com 按分支名的 5 分钟缓存
-SHA="$(curl -fsSL --max-time 10 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | head -c 40 || true)"
-echo "$SHA" | grep -qE '^[0-9a-f]{40}$' || SHA="$BRANCH"
-download "${GH_PROXY}https://raw.githubusercontent.com/$REPO/$SHA/agent/agent.py" "$DIR/agent.py.tmp"
+if [ -n "${PRESET_BASE:-}" ]; then
+  # 从主控下载，节点无需访问 GitHub
+  download "$PRESET_BASE/agent.py" "$DIR/agent.py.tmp"
+else
+  # 按最新提交 SHA 下载，避开 raw.githubusercontent.com 按分支名的 5 分钟缓存
+  SHA="$(curl -fsSL --max-time 10 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | head -c 40 || true)"
+  echo "$SHA" | grep -qE '^[0-9a-f]{40}$' || SHA="$BRANCH"
+  download "${GH_PROXY}https://raw.githubusercontent.com/$REPO/$SHA/agent/agent.py" "$DIR/agent.py.tmp"
+fi
 mv "$DIR/agent.py.tmp" "$DIR/agent.py"
 chmod +x "$DIR/agent.py"
 

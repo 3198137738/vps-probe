@@ -187,7 +187,7 @@ if cmd in ("table", "ids", "summary", "old"):
     elif cmd == "old":
         # 在线但客户端不是最新版的节点：id、名称、IP
         for n in nodes:
-            if n["online"] and not n.get("latest"):
+            if n["online"] and not n.get("latest") and n.get("platform", "linux") != "win":
                 print("%s\t%s\t%s" % (n["id"], n["name"], n["ip"]))
     elif cmd == "ids":
         for n in nodes:
@@ -246,6 +246,25 @@ add_command() {
   local p; p="$(proxy)"
   printf 'bash <(curl -fsSL %shttps://raw.githubusercontent.com/%s/%s/install.sh) -s %s -p %s -t %s' \
     "$p" "$REPO" "$BRANCH" "$(public_host)" "$(cfg_get agent_port)" "$(cfg_get token)"
+}
+
+# 主控一键安装地址：按请求来源自动下发 Linux / Windows 安装脚本（可在设置中改为域名地址）
+install_url() {
+  local u; u="$(cfg_get panel_url)"
+  [ -n "$u" ] || u="http://$(public_host):$(cfg_get http_port)"
+  printf '%s/i/%s' "${u%/}" "$(cfg_get token)"
+}
+
+show_commands() {
+  local u; u="$(install_url)"
+  green "Linux（root 执行）："
+  echo "curl -fsSL $u | bash"
+  echo
+  green "Windows（右键「以管理员身份运行」PowerShell 执行）："
+  echo "irm $u | iex"
+  echo
+  echo "运行后输入服务器名称即可。指定名称：Linux 在末尾加 -s -- -n 名称；Windows 在前面加 \$Name='名称';"
+  echo "主控地址无法访问时，Linux 也可用 GitHub 方式：$(add_command)"
 }
 
 restart_server() {
@@ -423,14 +442,35 @@ fetch_installer() {
 }
 
 # ssh_install 主机 SSH端口 用户 名称 install.sh路径：通过 SSH 在远程 VPS 上安装/重装客户端
+# 自动识别远程系统：Linux 用 bash 安装，Windows（OpenSSH）用 PowerShell 安装
+# 复用同一条 SSH 连接（ControlMaster），密码只需输入一次
 ssh_install() {
-  local host="$1" sport="$2" user="$3" name="$4" tmp="$5" args envs sudo=""
-  args="$(printf '%q ' -s "$(public_host)" -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name")"
-  envs="$(printf 'PROBE_REPO=%q PROBE_BRANCH=%q GH_PROXY=%q' "$REPO" "$BRANCH" "$(proxy)")"
-  [ "$user" = "root" ] || sudo="sudo"
+  local host="$1" sport="$2" user="$3" name="$4" tmp="$5" args envs sudo="" out rc ps enc
+  local ctl="/tmp/probe-ssh-$$-$RANDOM"
+  local opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10
+              -o ControlMaster=auto -o "ControlPath=$ctl" -o ControlPersist=120 -p "$sport")
   blue "正在通过 SSH 连接 $user@$host:$sport（按提示输入密码）..."
-  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -p "$sport" "$user@$host" \
-    "$sudo env $envs bash -s -- $args" < "$tmp"
+  out="$(ssh "${opts[@]}" "$user@$host" uname -s 2>&1)"; rc=$?
+  if [ "$rc" = 255 ]; then
+    red "SSH 连接失败：$out"; return 1
+  fi
+  if printf '%s' "$out" | grep -q '^Linux'; then
+    blue "检测到 Linux，开始安装 ..."
+    args="$(printf '%q ' -s "$(public_host)" -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name")"
+    envs="$(printf 'PROBE_REPO=%q PROBE_BRANCH=%q GH_PROXY=%q' "$REPO" "$BRANCH" "$(proxy)")"
+    [ "$user" = "root" ] || sudo="sudo"
+    ssh "${opts[@]}" "$user@$host" "$sudo env $envs bash -s -- $args" < "$tmp"; rc=$?
+  elif ssh "${opts[@]}" "$user@$host" cmd /c ver 2>/dev/null | grep -qi windows; then
+    blue "检测到 Windows，开始安装（SSH 用户需为管理员）..."
+    # PowerShell 单引号字符串中的 ' 需写成 ''；用 -EncodedCommand 避免 cmd / PowerShell 的引号转义问题
+    ps="\$Name='${name//\'/\'\'}'; irm '$(install_url)/win' | iex"
+    enc="$(printf '%s' "$ps" | iconv -f UTF-8 -t UTF-16LE | base64 -w0)"
+    ssh "${opts[@]}" "$user@$host" "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc"; rc=$?
+  else
+    red "无法识别远程系统：$out"; rc=1
+  fi
+  ssh "${opts[@]}" -O exit "$user@$host" >/dev/null 2>&1
+  return "$rc"
 }
 
 add_ssh() {
@@ -491,12 +531,12 @@ update_old_agents() {
 menu_add() {
   need_installed || return 1
   echo
-  echo " 1. 显示一键安装命令（复制到 VPS 上执行）"
-  echo " 2. 通过 SSH 远程安装到 VPS（推荐）"
+  echo " 1. 显示一键安装命令（Linux / Windows，复制到服务器上执行）"
+  echo " 2. 通过 SSH 远程安装（自动识别 Linux / Windows）"
   echo " 3. 把主控本机加入监控"
   echo " 0. 返回"
   case "$(ask "请选择: ")" in
-    1) echo; green "在要监控的 VPS 上执行（会提示输入服务器名称）："; echo; add_command; echo ;;
+    1) echo; show_commands ;;
     2) add_ssh ;;
     3) add_local ;;
   esac
@@ -540,8 +580,8 @@ show_info() {
   echo "端口    ：网页 $(cfg_get http_port)，上报 $(cfg_get agent_port)（防火墙/安全组需放行 TCP）"
   echo "版本    ：$(head -c 7 "$DIR/.version" 2>/dev/null)"
   echo
-  green "添加节点命令（在其它 VPS 上执行）："
-  add_command; echo
+  echo
+  show_commands
   echo "=================================================================="
 }
 
@@ -566,6 +606,7 @@ menu_settings() {
     echo "12. GitHub 加速前缀   [$(cfg_get gh_proxy)]"
     echo "13. 离线自动删除(天)  [$(cfg_get remove_offline_days)]（0 为不删除）"
     echo "14. 节点排序方式      [$sort]"
+    echo "15. 面板网址          [$(cfg_get panel_url)]（用于安装命令，留空为 http://对外地址:网页端口）"
     echo " 0. 保存并返回"
     case "$(ask "请选择: ")" in
       1) v="$(ask "网页标题: " "$(cfg_get title)")"; cfg_set title "$v"; changed=1 ;;
@@ -596,6 +637,8 @@ menu_settings() {
       13) v="$(ask "离线自动删除(天): " "$(cfg_get remove_offline_days)")"
           [[ "$v" =~ ^[0-9]+$ ]] && { cfg_set remove_offline_days "$v" int; changed=1; } ;;
       14) [ "$(cfg_get sort)" = "manual" ] && cfg_set sort name || cfg_set sort manual; changed=1 ;;
+      15) v="$(ask "面板网址（如 https://tz.example.com，输入 - 清空）: " "$(cfg_get panel_url)")"
+          [ "$v" = "-" ] && v=""; cfg_set panel_url "${v%/}" ;;
       0|"") break ;;
     esac
   done

@@ -4,6 +4,9 @@ server/server.py
 server/files.txt
 probe.sh
 agent/agent.py
+agent/agent.ps1
+install.sh
+install.ps1
 server/web/index.html
 server/web/favicon.ico
 server/web/css/bootstrap.min.css

@@ -15,6 +15,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shlex
 import socket
 import socketserver
 import sys
@@ -89,19 +90,26 @@ def read_version():
 VERSION = read_version() or "dev"
 
 
-def load_agent():
-    """读取随主控分发的 agent.py，返回 (源码, sha256)"""
-    for p in (os.path.join(BASE_DIR, "agent.py"), os.path.join(BASE_DIR, "..", "agent", "agent.py")):
-        try:
-            with open(p, "rb") as f:
-                data = f.read()
-            return data.decode("utf-8"), hashlib.sha256(data).hexdigest()
-        except Exception:
-            pass
-    return "", ""
+def find_file(name, *repo_path):
+    """安装目录中的文件优先，其次是源码仓库中的位置（便于源码直接运行）"""
+    for p in (os.path.join(BASE_DIR, name), os.path.join(BASE_DIR, "..", *repo_path)):
+        if os.path.isfile(p):
+            return p
+    return ""
 
 
-AGENT_SRC, AGENT_SHA = load_agent()
+def load_agent(name):
+    """读取随主控分发的客户端，返回 (原始字节, sha256)"""
+    path = find_file(name, "agent", name)
+    if not path:
+        return b"", ""
+    with open(path, "rb") as f:
+        data = f.read()
+    return data, hashlib.sha256(data).hexdigest()
+
+
+# 各系统的客户端：linux -> agent.py，win -> agent.ps1
+AGENTS = {"linux": load_agent("agent.py"), "win": load_agent("agent.ps1")}
 
 
 class Store:
@@ -175,7 +183,7 @@ class Store:
                 f.write(data)
             os.replace(tmp, path)
 
-    def touch(self, nid, ip="", sv=""):
+    def touch(self, nid, ip="", sv="", os_name="linux"):
         with self.lock:
             if nid not in self.nodes:
                 order = max([n["o"] for n in self.nodes.values()] or [0]) + 1
@@ -184,7 +192,8 @@ class Store:
             elif ip and self.nodes[nid].get("ip") != ip:
                 self.nodes[nid]["ip"] = ip
                 self.dirty = True
-            self.nodes[nid]["sv"] = sv   # 客户端 agent.py 的 SHA256，旧版客户端为空
+            self.nodes[nid]["sv"] = sv   # 客户端文件的 SHA256，旧版客户端为空
+            self.nodes[nid]["os"] = os_name
 
     def update(self, nid, msg):
         with self.lock:
@@ -243,7 +252,8 @@ class Store:
             return [{"id": nid, "name": self.name_of(n), "online": now - n["t"] < CFG["offline_timeout"],
                      "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
                      "last": int(n["t"]), "os": n["s"][8] if n["s"] else "",
-                     "latest": bool(AGENT_SHA) and n.get("sv") == AGENT_SHA}
+                     "latest": bool(n.get("sv")) and n.get("sv") == AGENTS[n.get("os", "linux")][1],
+                     "platform": n.get("os", "linux")}
                     for nid, n in items]
 
     def cleanup(self):
@@ -348,8 +358,10 @@ class AgentHandler(socketserver.StreamRequestHandler):
             self.wfile.write(b'{"ok":0,"msg":"removed"}\n')
             log("已删除的节点尝试连接，已通知其卸载:", nid[:8], peer)
             return
-        if auth.get("up"):   # 客户端请求下载新版 agent.py
-            self.wfile.write((json.dumps({"ok": 1, "agent": AGENT_SRC}) + "\n").encode())
+        os_name = "win" if auth.get("os") == "win" else "linux"
+        agent_data, agent_sha = AGENTS[os_name]
+        if auth.get("up"):   # 客户端请求下载新版客户端
+            self.wfile.write((json.dumps({"ok": 1, "agent": agent_data.decode("utf-8")}) + "\n").encode())
             log("节点下载新版客户端:", nid[:8], peer)
             return
         resp = {"ok": 1, "i": CFG["interval"], "p": CFG["ping"],
@@ -357,12 +369,12 @@ class AgentHandler(socketserver.StreamRequestHandler):
         if nid == "install-check":
             # 告知安装脚本原节点 ID 是否已被删除，以便重新生成 ID
             resp["removed"] = str(auth.get("rid", "")) in STORE.removed
-        if CFG.get("agent_auto_update") and AGENT_SHA:
-            resp["av"] = AGENT_SHA
+        if CFG.get("agent_auto_update") and agent_sha:
+            resp["av"] = agent_sha
         self.wfile.write((json.dumps(resp) + "\n").encode())
         if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
             return
-        STORE.touch(nid, peer[7:] if peer.startswith("::ffff:") else peer, str(auth.get("sv", "")))
+        STORE.touch(nid, peer[7:] if peer.startswith("::ffff:") else peer, str(auth.get("sv", "")), os_name)
         with STORE.lock:
             old = STORE.conns.get(nid)
             STORE.conns[nid] = sock
@@ -440,6 +452,8 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlparse(self.path)
+        if url.path.startswith(("/i/", "/a/")):
+            return self.install(url.path)
         if url.path == "/api/stats":
             body, gz = STORE.stats()
             return self.send(200, body, gz=gz)
@@ -474,6 +488,49 @@ class WebHandler(BaseHTTPRequestHandler):
         self.send(200, data, ctype, "no-cache", gzip.compress(data, 6), etag)
 
     do_HEAD = do_GET
+
+    def install(self, path):
+        """
+        一键安装地址（需 Token）：
+          /i/<token>[/linux|/win]  按请求来源自动返回 bash 或 PowerShell 安装脚本，已预置主控地址与 Token
+          /a/<token>/agent.py|agent.ps1  客户端文件，安装脚本从这里下载，节点无需访问 GitHub
+        """
+        parts = path.strip("/").split("/")
+        if len(parts) < 2 or not secrets.compare_digest(parts[1], CFG["token"]):
+            return self.send(403, b"forbidden", "text/plain")
+        token = parts[1]
+        extra = parts[2] if len(parts) > 2 else ""
+        if parts[0] == "a":
+            data = {"agent.py": AGENTS["linux"][0], "agent.ps1": AGENTS["win"][0]}.get(extra)
+            if not data:
+                return self.send(404, b"not found", "text/plain")
+            return self.send(200, data, "application/octet-stream")
+
+        ua = self.headers.get("User-Agent", "")
+        win = extra == "win" or (extra != "linux" and "PowerShell" in ua)
+        script = find_file("install.ps1" if win else "install.sh", "install.ps1" if win else "install.sh")
+        if not script:
+            return self.send(404, b"installer not found", "text/plain")
+        with open(script, encoding="utf-8-sig") as f:
+            body = f.read()
+        # 主控地址：优先使用配置的对外地址，否则取访问安装地址时使用的主机名
+        req_host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+        host_only = req_host.rsplit("]", 1)[0].lstrip("[") if req_host.startswith("[") else req_host.split(":")[0]
+        server = CFG.get("public_host") or host_only
+        scheme = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+        base = "%s://%s/a/%s" % (scheme, req_host, token)
+        if win:
+            q = lambda v: "'" + str(v).replace("'", "''") + "'"
+            preset = "$PresetServer = %s; $PresetPort = %d; $PresetToken = %s; $PresetBase = %s\n" % (
+                q(server), int(CFG["agent_port"]), q(token), q(base))
+            body = preset + body
+        else:
+            preset = "PRESET_SERVER=%s; PRESET_PORT=%d; PRESET_TOKEN=%s; PRESET_BASE=%s\n" % (
+                shlex.quote(server), int(CFG["agent_port"]), shlex.quote(token), shlex.quote(base))
+            first, _, rest = body.partition("\n")
+            body = first + "\n" + preset + rest
+        log("下发%s安装脚本: %s" % ("Windows" if win else "Linux", self.client_address[0]))
+        self.send(200, body.encode("utf-8"), "text/plain; charset=utf-8")
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
