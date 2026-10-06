@@ -7,6 +7,7 @@
 - http_port ：提供网页与 /api/stats 接口（gzip 压缩）
 """
 import gzip
+import html
 import json
 import mimetypes
 import os
@@ -196,7 +197,9 @@ class Store:
                     "memory_total": s[5] // 1024, "memory_used": d[8] // 1024,       # KB
                     "swap_total": s[6] // 1024, "swap_used": d[9] // 1024,           # KB
                     "hdd_total": s[7] // 1048576, "hdd_used": d[10] // 1048576,      # MB
-                    "io_read": d[11], "io_write": d[12], "custom": "",
+                    "io_read": d[11], "io_write": d[12],
+                    # 前端以 innerHTML 显示 custom，需转义
+                    "custom": html.escape("系统: %s (%s) | %s 核 %s" % (s[8], s[9], s[4], s[10])),
                 })
         body = json.dumps({"servers": servers, "updated": str(int(now))},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
