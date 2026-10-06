@@ -1,0 +1,18 @@
+# 主控安装 / 自动更新时下载的文件清单（仓库路径，server/ 与 agent/ 前缀映射到安装目录）
+# 新增前端或程序文件时在此追加一行，推送后主控会自动下载
+server/server.py
+server/files.txt
+agent/agent.py
+server/web/index.html
+server/web/favicon.ico
+server/web/css/bootstrap.min.css
+server/web/css/bootstrap-theme.min.css
+server/web/css/light.css
+server/web/css/dark.css
+server/web/js/jquery.min.js
+server/web/js/bootstrap.min.js
+server/web/js/serverstatus.js
+server/web/js/html5shiv.js
+server/web/js/respond.min.js
+server/web/img/light.png
+server/web/img/dark.png

@@ -44,24 +44,28 @@ download() {
 }
 
 green "正在下载服务端 ..."
+# 取最新提交 SHA，按 SHA 下载保证文件版本一致，并作为自动更新的版本基准
+SHA="$(curl -fsSL --max-time 10 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | head -c 40)"
+echo "$SHA" | grep -qE '^[0-9a-f]{40}$' || SHA=""
+RAW="${GH_PROXY}https://raw.githubusercontent.com/$REPO/${SHA:-$BRANCH}"
 rm -rf "$DIR/web"
-mkdir -p "$DIR/web/css" "$DIR/web/js" "$DIR/web/img"
-RAW="${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/server"
-download "$RAW/server.py" "$DIR/server.py"
-# 前端：ServerStatus 1.0.9（cppla/ServerStatus，MIT）
-for f in index.html favicon.ico \
-         css/bootstrap.min.css css/bootstrap-theme.min.css css/light.css css/dark.css \
-         js/jquery.min.js js/bootstrap.min.js js/serverstatus.js js/html5shiv.js js/respond.min.js \
-         img/light.png img/dark.png; do
-  download "$RAW/web/$f" "$DIR/web/$f"
+mkdir -p "$DIR"
+download "$RAW/server/files.txt" "$DIR/files.txt"
+# 按清单下载：server/xxx、agent/xxx 映射到 $DIR/xxx（前端为 ServerStatus 1.0.9，cppla/ServerStatus，MIT）
+grep -vE '^\s*(#|$)' "$DIR/files.txt" | tr -d '\r' | while read -r f; do
+  dest="$DIR/${f#*/}"
+  mkdir -p "$(dirname "$dest")"
+  download "$RAW/$f" "$dest"
 done
+# 记录版本；取不到 SHA 时写 unknown，主控首次检查时会自动更新到最新
+echo "${SHA:-unknown}" > "$DIR/.version"
 
 PY="$(command -v python3)"
 
 # 确定端口：已有配置 > 默认值，可用环境变量 PROBE_HTTP_PORT / PROBE_AGENT_PORT 覆盖，并写入配置
-read -r HTTP_PORT AGENT_PORT <<<"$(python3 - "$DIR/config.json" "${PROBE_HTTP_PORT:-}" "${PROBE_AGENT_PORT:-}" <<'PYEOF'
+read -r HTTP_PORT AGENT_PORT <<<"$(python3 - "$DIR/config.json" "${PROBE_HTTP_PORT:-}" "${PROBE_AGENT_PORT:-}" "$REPO" "$BRANCH" "$GH_PROXY" <<'PYEOF'
 import json, sys
-path, hp, ap = sys.argv[1:]
+path, hp, ap, repo, branch, proxy = sys.argv[1:]
 try:
     c = json.load(open(path, encoding="utf-8"))
 except Exception:
@@ -72,6 +76,9 @@ if ap: c["agent_port"] = int(ap)
 elif c.get("agent_port") == 35601: c["agent_port"] = 35688
 c.setdefault("http_port", 8080)
 c.setdefault("agent_port", 35688)
+# 自动更新的来源仓库
+c["repo"], c["branch"] = repo, branch
+if proxy: c["gh_proxy"] = proxy
 json.dump(c, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print(c["http_port"], c["agent_port"])
 PYEOF

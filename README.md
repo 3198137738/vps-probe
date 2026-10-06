@@ -74,8 +74,21 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 | `offline_timeout` | 15 | 超过多少秒无数据判为离线 |
 | `ping_interval` / `ping_window` | 60 / 10 | 三网探测间隔（秒）/ 丢包统计次数 |
 | `ping` | cloudcpp 三网节点 | CU/CT/CM 探测目标（`域名:端口`，TCP 握手测速），失效时可自行替换 |
+| `auto_update` / `update_interval` | true / 600 | 主控自动从 GitHub 更新 / 检查间隔（秒） |
+| `agent_auto_update` | true | 节点自动从主控获取新版客户端 |
+| `gh_proxy` | 空 | 主控下载 GitHub 文件用的加速前缀 |
 
 修改后执行 `systemctl restart probe-server`，客户端会自动重连并获取新配置。
+
+## 自动更新
+
+推送到 GitHub 后无需任何操作：
+
+1. 主控每 10 分钟查询一次仓库最新提交，有新提交时按 `server/files.txt` 清单下载全部文件并自动重启
+2. 已打开的网页检测到版本变化后自动刷新，显示修改后的页面
+3. 节点重连主控时比对客户端版本，不一致则**从主控**下载新版 `agent.py` 并原地重启（节点不访问 GitHub）
+
+新增前端或程序文件时，需在 `server/files.txt` 中追加一行。
 
 ## 资源与流量
 

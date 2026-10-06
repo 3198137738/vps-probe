@@ -5,18 +5,22 @@
 - 仅依赖 Python3 标准库
 - agent_port：接收客户端 TCP 长连接上报
 - http_port ：提供网页与 /api/stats 接口（gzip 压缩）
+- 自动更新：定期检查 GitHub 仓库新提交，自动下载并重启；客户端连接时从主控获取新版 agent.py
 """
 import gzip
+import hashlib
 import html
 import json
 import mimetypes
 import os
+import re
 import secrets
 import socket
 import socketserver
 import sys
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -25,6 +29,7 @@ DATA_DIR = os.environ.get("PROBE_DATA", BASE_DIR)
 WEB_DIR = os.path.join(BASE_DIR, "web")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
+VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
     "title": "云监控",
@@ -41,6 +46,12 @@ DEFAULT_CONFIG = {
         "ct": "ct.tz.cloudcpp.com:80",
         "cm": "cm.tz.cloudcpp.com:80",
     },
+    "auto_update": True,         # 主控自动从 GitHub 更新
+    "agent_auto_update": True,   # 客户端自动从主控更新
+    "update_interval": 600,      # 检查更新间隔（秒）
+    "repo": "3198137738/vps-probe",
+    "branch": "main",
+    "gh_proxy": "",              # 下载文件用的 GitHub 加速前缀，如 https://ghproxy.net/
 }
 
 
@@ -62,6 +73,33 @@ def load_config():
 
 
 CFG = load_config()
+
+
+def read_version():
+    try:
+        with open(VERSION_FILE) as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
+# 版本号：安装/更新时写入的 Git 提交 SHA；源码直接运行时为 dev（不自动更新）
+VERSION = read_version() or "dev"
+
+
+def load_agent():
+    """读取随主控分发的 agent.py，返回 (源码, sha256)"""
+    for p in (os.path.join(BASE_DIR, "agent.py"), os.path.join(BASE_DIR, "..", "agent", "agent.py")):
+        try:
+            with open(p, "rb") as f:
+                data = f.read()
+            return data.decode("utf-8"), hashlib.sha256(data).hexdigest()
+        except Exception:
+            pass
+    return "", ""
+
+
+AGENT_SRC, AGENT_SHA = load_agent()
 
 
 class Store:
@@ -201,7 +239,7 @@ class Store:
                     # 前端以 innerHTML 显示 custom，需转义
                     "custom": html.escape("系统: %s (%s) | %s 核 %s" % (s[8], s[9], s[4], s[10])),
                 })
-        body = json.dumps({"servers": servers, "updated": str(int(now))},
+        body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7]},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         gz = gzip.compress(body, 6)
         self.ss_cache = (now, body, gz)
@@ -227,8 +265,14 @@ class AgentHandler(socketserver.StreamRequestHandler):
             self.wfile.write(b'{"ok":0,"msg":"token error"}\n')
             log("认证失败:", peer)
             return
+        if auth.get("up"):   # 客户端请求下载新版 agent.py
+            self.wfile.write((json.dumps({"ok": 1, "agent": AGENT_SRC}) + "\n").encode())
+            log("节点下载新版客户端:", nid[:8], peer)
+            return
         resp = {"ok": 1, "i": CFG["interval"], "p": CFG["ping"],
                 "pi": CFG["ping_interval"], "pw": CFG["ping_window"]}
+        if CFG.get("agent_auto_update") and AGENT_SHA:
+            resp["av"] = AGENT_SHA
         self.wfile.write((json.dumps(resp) + "\n").encode())
         if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
             return
@@ -294,10 +338,12 @@ class WebHandler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
-    def send(self, code, body, ctype="application/json; charset=utf-8", cache="no-cache", gz=None):
+    def send(self, code, body, ctype="application/json; charset=utf-8", cache="no-cache", gz=None, etag=None):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", cache)
+        if etag:
+            self.send_header("ETag", etag)
         if gz is not None and "gzip" in self.headers.get("Accept-Encoding", ""):
             body = gz
             self.send_header("Content-Encoding", "gzip")
@@ -318,12 +364,21 @@ class WebHandler(BaseHTTPRequestHandler):
         full = os.path.realpath(os.path.join(WEB_DIR, path.lstrip("/")))
         if not full.startswith(os.path.realpath(WEB_DIR) + os.sep) or not os.path.isfile(full):
             return self.send(404, b"not found", "text/plain")
+        # 静态文件每次向服务端确认是否变化（未变化返回 304，几乎不耗流量），更新后立即生效
+        st = os.stat(full)
+        etag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
         with open(full, "rb") as f:
             data = f.read()
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype.endswith("javascript"):
             ctype += "; charset=utf-8"
-        self.send(200, data, ctype, "public, max-age=3600", gzip.compress(data, 6))
+        self.send(200, data, ctype, "no-cache", gzip.compress(data, 6), etag)
 
     do_HEAD = do_GET
 
@@ -353,6 +408,62 @@ def bind(server_cls, handler, port):
     return server_cls(("0.0.0.0", port), handler)
 
 
+# ---------------------------------------------------------------- 自动更新
+
+def http_get(url, accept=None, limit=8 << 20):
+    headers = {"User-Agent": "probe-server"}
+    if accept:
+        headers["Accept"] = accept
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as r:
+        return r.read(limit)
+
+
+def check_update():
+    """有新提交时按 server/files.txt 清单下载全部文件，替换后重启自身"""
+    repo, branch = CFG["repo"], CFG["branch"]
+    sha = http_get("https://api.github.com/repos/%s/commits/%s" % (repo, branch),
+                   "application/vnd.github.sha", 128).decode().strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha) or sha == VERSION:
+        return
+    log("发现新版本 %s，开始更新" % sha[:7])
+    # 按提交 SHA 下载，避免 raw 缓存导致拿到旧文件
+    raw = "%shttps://raw.githubusercontent.com/%s/%s/" % (CFG.get("gh_proxy") or "", repo, sha)
+    files = [x.strip() for x in http_get(raw + "server/files.txt").decode().splitlines()
+             if x.strip() and not x.startswith("#")]
+    tmp_dir = os.path.join(BASE_DIR, ".update")
+    staged = []
+    for path in files:
+        # 仓库路径 server/xxx、agent/xxx 映射到安装目录下的 xxx
+        dest = path.split("/", 1)[1] if path.startswith(("server/", "agent/")) else path
+        if ".." in dest.split("/"):
+            continue
+        data = http_get(raw + path)
+        tmp = os.path.join(tmp_dir, dest)
+        os.makedirs(os.path.dirname(tmp), exist_ok=True)
+        with open(tmp, "wb") as f:
+            f.write(data)
+        staged.append((tmp, os.path.join(BASE_DIR, dest)))
+    # 全部下载成功后再替换
+    for tmp, dest in staged:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        os.replace(tmp, dest)
+    with open(VERSION_FILE, "w") as f:
+        f.write(sha)
+    log("更新完成，重启主控")
+    STORE.save()
+    os.execv(sys.executable, [sys.executable, "-u", os.path.join(BASE_DIR, "server.py")])
+
+
+def update_loop():
+    time.sleep(30)
+    while True:
+        try:
+            check_update()
+        except Exception as e:
+            log("检查更新失败:", e)
+        time.sleep(max(60, int(CFG.get("update_interval") or 600)))
+
+
 def main():
     agent_srv = bind(AgentServer, AgentHandler, CFG["agent_port"])
     web_srv = bind(WebServer, WebHandler, CFG["http_port"])
@@ -360,6 +471,9 @@ def main():
     threading.Thread(target=web_srv.serve_forever, daemon=True).start()
     log("网页端口: %s  上报端口: %s" % (CFG["http_port"], CFG["agent_port"]))
     log("Token: %s" % CFG["token"])
+    log("版本: %s" % VERSION[:7])
+    if CFG.get("auto_update") and VERSION != "dev":
+        threading.Thread(target=update_loop, daemon=True).start()
     try:
         while True:
             time.sleep(30)

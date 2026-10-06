@@ -5,6 +5,7 @@
 - 仅依赖 Python3 标准库，常驻内存约 10MB
 - 通过 TCP 长连接向服务端推送紧凑的 JSON 数组，静态信息仅在变化时发送，最大限度节省流量
 """
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,8 @@ from collections import deque
 from datetime import date
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.abspath(__file__), "rb") as _f:
+    SELF_SHA = hashlib.sha256(_f.read()).hexdigest()   # 自身版本，用于与主控比对
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 STATE_FILE = os.path.join(BASE_DIR, "state.json")
 
@@ -379,6 +382,7 @@ class Agent:
         self.prev_io = disk_io()
         self.prev_t = time.time()
         self.last_save = time.time()
+        self.failed_update = None
 
     def refresh_geo(self):
         # 国家与协议栈每 6 小时检测一次
@@ -434,6 +438,32 @@ class Agent:
             self.traffic.save()
         return d
 
+    def self_update(self, host, port, av):
+        """从主控下载新版 agent.py，校验后替换自身并原地重启（PID 不变，兼容 systemd/OpenRC/nohup）"""
+        log("发现新版客户端，开始更新")
+        try:
+            sock = socket.create_connection((host, port), timeout=30)
+            try:
+                auth = {"t": self.cfg["token"], "id": self.cfg["id"], "up": 1}
+                sock.sendall((json.dumps(auth) + "\n").encode())
+                resp = json.loads(sock.makefile("rb").readline(4 << 20).decode() or "{}")
+            finally:
+                sock.close()
+            data = (resp.get("agent") or "").encode("utf-8")
+            if hashlib.sha256(data).hexdigest() != av:
+                raise ValueError("校验失败")
+            path = os.path.abspath(__file__)
+            with open(path + ".tmp", "wb") as f:
+                f.write(data)
+            os.replace(path + ".tmp", path)
+        except Exception as e:
+            log("客户端更新失败:", e)
+            self.failed_update = av   # 同一版本不再重试，继续正常上报
+            return
+        log("客户端已更新，重启")
+        self.traffic.save()
+        os.execv(sys.executable, [sys.executable, "-u", os.path.abspath(__file__)])
+
     def run_once(self):
         host, port = self.cfg["server"], int(self.cfg.get("port", 35688))
         log("连接服务端 %s:%s" % (host, port))
@@ -446,6 +476,11 @@ class Agent:
             if not resp.get("ok"):
                 log("认证失败:", resp.get("msg", "未知错误"))
                 time.sleep(60)
+                return
+            av = resp.get("av")
+            if av and av != SELF_SHA and av != self.failed_update:
+                sock.close()
+                self.self_update(host, port, av)
                 return
             interval = max(1, int(resp.get("i", 3)))
             self.pinger.configure(resp.get("p"), resp.get("pi"), resp.get("pw"))

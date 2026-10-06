@@ -2,6 +2,7 @@
 var error = 0;
 var d = 0;
 var server_status = new Array();
+var page_version = "";
 
 function timeSince(date) {
 	if(date == 0)
@@ -64,6 +65,13 @@ function uptime() {
 		return;
 	$.getJSON("json/stats.json", function(result) {
 		$("#loading-notice").remove();
+		// 主控更新后版本号变化，自动刷新页面加载新前端
+		if (result.version) {
+			if (!page_version)
+				page_version = result.version;
+			else if (page_version != result.version)
+				result.reload = true;
+		}
 		if(result.reload)
 			setTimeout(function() { location.reload() }, 1000);
 
