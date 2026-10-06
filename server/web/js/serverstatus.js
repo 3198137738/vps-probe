@@ -279,17 +279,21 @@ function uptime() {
 
 				// tcp, udp, process, thread count
 				ExpandRow[0].children["expand_tupd"].innerHTML = "TCP/UDP/进/线: " + result.servers[i].tcp_count + " / " + result.servers[i].udp_count + " / " + result.servers[i].process_count+ " / " + result.servers[i].thread_count;
-				ExpandRow[0].children["expand_ping"].innerHTML = "联通/电信/移动: " + result.servers[i].time_10010 + "ms / " + result.servers[i].time_189 + "ms / " + result.servers[i].time_10086 + "ms"
-
-                // ping
+                // ping：表格显示三网延迟，丢包率放在详情中；任一线路丢包 >= 20% 时变色提醒
                 var PING_10010 = result.servers[i].ping_10010.toFixed(0);
                 var PING_189 = result.servers[i].ping_189.toFixed(0);
                 var PING_10086 = result.servers[i].ping_10086.toFixed(0);
+                var ms = function(t) { return t > 0 ? t : "-"; };
+				ExpandRow[0].children["expand_ping"].innerHTML = "联通/电信/移动: " +
+					ms(result.servers[i].time_10010) + "ms (" + PING_10010 + "%) / " +
+					ms(result.servers[i].time_189) + "ms (" + PING_189 + "%) / " +
+					ms(result.servers[i].time_10086) + "ms (" + PING_10086 + "%)";
                 if (PING_10010 >= 20 || PING_189 >= 20 || PING_10086 >= 20)
                     TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-warning";
                 else
                     TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-success";
-	            TableRow.children["ping"].children[0].children[0].innerHTML = PING_10010 + "%💻" + PING_189 + "%💻" + PING_10086 + "%";
+	            TableRow.children["ping"].children[0].children[0].innerHTML =
+					ms(result.servers[i].time_10010) + "💻" + ms(result.servers[i].time_189) + "💻" + ms(result.servers[i].time_10086) + "ms";
 
 				// Custom
 				if (result.servers[i].custom) {
