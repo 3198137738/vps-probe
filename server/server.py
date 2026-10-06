@@ -182,6 +182,8 @@ class AgentHandler(socketserver.StreamRequestHandler):
         resp = {"ok": 1, "i": CFG["interval"], "p": CFG["ping"],
                 "pi": CFG["ping_interval"], "pw": CFG["ping_window"]}
         self.wfile.write((json.dumps(resp) + "\n").encode())
+        if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
+            return
         STORE.touch(nid)
         with STORE.lock:
             old = STORE.conns.get(nid)

@@ -15,6 +15,13 @@ green() { printf '\033[32m%s\033[0m\n' "$*"; }
 
 [ "$(id -u)" = "0" ] || { red "请使用 root 运行"; exit 1; }
 
+if [ "$1" != "-u" ]; then
+  echo "=================================================================="
+  echo " 主控服务端：整套监控【只需要在一台机器上安装】"
+  echo " 其它 VPS 请勿运行本脚本，只需运行 install.sh 把数据上报到这台主控"
+  echo "=================================================================="
+fi
+
 if [ "$1" = "-u" ]; then
   systemctl disable --now $SERVICE >/dev/null 2>&1 || true
   rm -f /etc/systemd/system/$SERVICE.service
@@ -68,8 +75,24 @@ IP="$(curl -fsS4 --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/nu
 [ -n "$IP" ] || IP="服务端IP"
 
 green "服务端安装完成！"
-echo "监控页面：http://$IP:$HTTP_PORT"
-echo "请放行端口 $HTTP_PORT（网页）和 $AGENT_PORT（上报）"
+
+# 主控机本身也作为一个节点显示
+printf '是否同时监控本机？[Y/n] '
+read -r ANS </dev/tty || ANS=""
+case "$ANS" in
+  n|N) ;;
+  *) download "${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh" /tmp/probe-install.sh
+     PROBE_REPO="$REPO" PROBE_BRANCH="$BRANCH" GH_PROXY="$GH_PROXY" \
+       bash /tmp/probe-install.sh -s 127.0.0.1 -p "$AGENT_PORT" -t "$TOKEN" || red "本机节点安装失败"
+     rm -f /tmp/probe-install.sh ;;
+esac
+
 echo
-green "在需要监控的 VPS 上执行以下命令，输入服务器名称即可添加："
+echo "=================================================================="
+green "监控页面（所有节点都在这里显示）：http://$IP:$HTTP_PORT"
+echo "请在防火墙/安全组放行 TCP 端口 $HTTP_PORT（网页）和 $AGENT_PORT（上报）"
+echo
+green "在【其它】需要监控的 VPS 上执行下面这条命令，输入服务器名称即可加入本面板："
+echo
 echo "bash <(curl -fsSL ${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh) -s $IP -p $AGENT_PORT -t $TOKEN"
+echo "=================================================================="

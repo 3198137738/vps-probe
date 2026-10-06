@@ -57,13 +57,19 @@ if [ -f "$DIR/config.json" ] && command -v python3 >/dev/null 2>&1; then
   [ "$PORT" = "35601" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
 fi
 
-[ -n "$SERVER" ] || { red "缺少服务端地址：-s"; exit 1; }
-[ -n "$TOKEN" ]  || { red "缺少 Token：-t"; exit 1; }
+ask() {  # ask 提示 变量名
+  local v=""
+  while [ -z "$v" ]; do printf '%s' "$1"; read -r v </dev/tty; done
+  printf -v "$2" '%s' "$v"
+}
 
-while [ -z "$NAME" ]; do
-  printf '请输入服务器名称: '
-  read -r NAME </dev/tty
-done
+if [ -z "$SERVER" ] || [ -z "$TOKEN" ]; then
+  echo "本脚本把当前 VPS 作为节点，上报到【主控服务器】，所有节点都在主控的网页中统一显示。"
+  echo "主控地址和 Token 见主控机运行 install_server.sh 后的输出（或主控机 /opt/probe-server/config.json）。"
+fi
+[ -n "$SERVER" ] || ask "请输入主控服务器 IP 或域名: " SERVER
+[ -n "$TOKEN" ]  || ask "请输入主控 Token: " TOKEN
+[ -n "$NAME" ]   || ask "请输入服务器名称: " NAME
 
 # 安装 python3
 if ! command -v python3 >/dev/null 2>&1; then
@@ -80,6 +86,27 @@ if ! command -v python3 >/dev/null 2>&1; then
     red "无法自动安装 python3，请手动安装后重试"; exit 1
   fi
 fi
+
+# 安装前先检查能否连上主控并通过认证，避免装完才发现节点不显示
+green "正在检查主控连接 $SERVER:$PORT ..."
+CHECK="$(python3 - "$SERVER" "$PORT" "$TOKEN" <<'PYEOF'
+import json, socket, sys
+host, port, token = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+try:
+    s = socket.create_connection((host, port), timeout=8)
+    s.sendall((json.dumps({"t": token, "id": "install-check"}) + "\n").encode())
+    r = json.loads(s.makefile("rb").readline().decode() or "{}")
+    print("ok" if r.get("ok") else "token")
+except Exception as e:
+    print("conn %s" % e)
+PYEOF
+)"
+case "$CHECK" in
+  ok) green "主控连接正常" ;;
+  token) red "Token 错误，请核对主控机 /opt/probe-server/config.json 中的 token"; exit 1 ;;
+  *) red "无法连接主控 $SERVER:$PORT（${CHECK#conn }）"
+     red "请确认主控已安装服务端，且防火墙/安全组已放行 TCP $PORT 端口"; exit 1 ;;
+esac
 
 download() {
   if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"

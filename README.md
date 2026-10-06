@@ -8,17 +8,29 @@
 
 > 如果 fork 到自己的仓库，请把 `install.sh`、`install_server.sh` 中的 `REPO` 默认值改成你的仓库名（或执行时设置环境变量 `PROBE_REPO=用户/仓库`）。
 
-### 1. 安装服务端
+### 架构（重要）
+
+```
+VPS-A ──┐
+VPS-B ──┼──►  主控服务器（网页面板，所有节点统一显示在这里）
+VPS-C ──┘
+```
+
+- **主控只装一台**：在其中一台机器上运行 `install_server.sh`，它提供网页面板。
+- **其它 VPS 只装客户端**：运行 `install.sh`，`-s` 指向主控 IP。
+- 不要在每台 VPS 上都运行 `install_server.sh`，否则每台都会变成一个只显示自己的独立面板。已经装错的机器可执行 `bash install_server.sh -u` 卸载服务端，再按下面第 2 步重新添加。
+
+### 1. 安装服务端（仅主控机）
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install_server.sh)
 ```
 
-安装完成后会输出监控页面地址和**添加节点的一键命令**。需放行端口 `8080`（网页）和 `35601`（上报）。
+安装时会询问是否同时监控本机，完成后输出监控页面地址和**添加其它节点的一键命令**。需放行端口 `8080`（网页）和 `35601`（上报）。
 
-### 2. 添加 VPS
+### 2. 添加其它 VPS
 
-在被监控的 VPS 上执行服务端输出的命令，按提示输入服务器名称即可：
+在其它 VPS 上执行主控输出的命令，按提示输入服务器名称即可（不带参数运行时会逐项询问主控地址与 Token，并在安装前检查能否连上主控）：
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 服务端IP -p 35601 -t TOKEN
