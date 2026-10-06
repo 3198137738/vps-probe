@@ -404,7 +404,7 @@ add_local() {
   local tmp name
   name="$(ask "本机节点名称: " "$(hostname)")"
   tmp="$(mktemp)"
-  download "$(raw "$BRANCH/install.sh")" "$tmp" || { red "下载 install.sh 失败"; rm -f "$tmp"; return 1; }
+  download "$(raw "$(latest_sha || echo "$BRANCH")/install.sh")" "$tmp" || { red "下载 install.sh 失败"; rm -f "$tmp"; return 1; }
   PROBE_REPO="$REPO" PROBE_BRANCH="$BRANCH" GH_PROXY="$(proxy)" \
     bash "$tmp" -s 127.0.0.1 -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name"
   rm -f "$tmp"
@@ -418,7 +418,7 @@ add_ssh() {
   user="$(ask "SSH 用户: " root)"
   name="$(ask "服务器名称: ")"; [ -n "$name" ] || { red "名称不能为空"; return 1; }
   tmp="$(mktemp)"
-  download "$(raw "$BRANCH/install.sh")" "$tmp" || { red "下载 install.sh 失败"; rm -f "$tmp"; return 1; }
+  download "$(raw "$(latest_sha || echo "$BRANCH")/install.sh")" "$tmp" || { red "下载 install.sh 失败"; rm -f "$tmp"; return 1; }
   args="$(printf '%q ' -s "$(public_host)" -p "$(cfg_get agent_port)" -t "$(cfg_get token)" -n "$name")"
   envs="$(printf 'PROBE_REPO=%q PROBE_BRANCH=%q GH_PROXY=%q' "$REPO" "$BRANCH" "$(proxy)")"
   [ "$user" = "root" ] || sudo="sudo"
@@ -601,7 +601,7 @@ menu_uninstall() {
        confirm "确认卸载主控？" && uninstall_server ;;
     3) confirm "确认删除本机全部探针文件与服务？" || return 0
        local tmp; tmp="$(mktemp)"
-       download "$(raw "$BRANCH/uninstall.sh")" "$tmp" && bash "$tmp" -y
+       download "$(raw "$(latest_sha || echo "$BRANCH")/uninstall.sh")" "$tmp" && bash "$tmp" -y
        rm -f "$tmp" "$BIN" ;;
   esac
 }

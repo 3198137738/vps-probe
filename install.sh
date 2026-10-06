@@ -138,7 +138,10 @@ download() {
 
 mkdir -p "$DIR"
 green "正在下载客户端 ..."
-download "${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/agent/agent.py" "$DIR/agent.py.tmp"
+# 按最新提交 SHA 下载，避开 raw.githubusercontent.com 按分支名的 5 分钟缓存
+SHA="$(curl -fsSL --max-time 10 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | head -c 40 || true)"
+echo "$SHA" | grep -qE '^[0-9a-f]{40}$' || SHA="$BRANCH"
+download "${GH_PROXY}https://raw.githubusercontent.com/$REPO/$SHA/agent/agent.py" "$DIR/agent.py.tmp"
 mv "$DIR/agent.py.tmp" "$DIR/agent.py"
 chmod +x "$DIR/agent.py"
 
