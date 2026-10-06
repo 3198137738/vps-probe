@@ -60,6 +60,19 @@ function formatTime(ts) {
 		p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds());
 }
 
+// vps789 三网 24 小时 ping 图地址；图片每 20 分钟更新，按 20 分钟加时间参数避免浏览器用旧缓存
+function ping24hImg(id) {
+	return "https://vps789.com/public/view/" + encodeURIComponent(id) + "?t=" + Math.floor(Date.now() / 1200000);
+}
+
+// 只在内容变化时才替换，避免每 3 秒重建图片导致闪烁和重复下载
+function setHtml(el, html) {
+	if (el._html !== html) {
+		el._html = html;
+		el.innerHTML = html;
+	}
+}
+
 // 位置显示为国旗（两位国家代码），图片加载失败时回退为文字
 function flagImg(cc) {
 	if (!/^[a-zA-Z]{2}$/.test(cc || ""))
@@ -116,6 +129,7 @@ function uptime() {
 						"<div id=\"expand_ping\">加载中</div>" +
 						"<div id=\"expand_custom\">加载中</div>" +
 						"<div id=\"expand_cpu\">加载中</div>" +
+						"<div id=\"expand_ping24h\"></div>" +
 					"</div></td></tr>"
 				);
 				TableRow = $("#servers tr#r" + i);
@@ -173,6 +187,7 @@ function uptime() {
 					TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-danger";
 					TableRow.children["ping"].children[0].children[0].style.width = "100%";
 					TableRow.children["ping"].children[0].children[0].innerHTML = "<small>关闭</small>";
+					TableRow.children["ping"].children[0].children[0]._html = "";
 					if(ExpandRow.hasClass("in")) {
 						ExpandRow.collapse("hide");
 					}
@@ -305,18 +320,17 @@ function uptime() {
 					ms(result.servers[i].time_10010) + " (" + PING_10010 + "%) / " +
 					ms(result.servers[i].time_189) + " (" + PING_189 + "%) / " +
 					ms(result.servers[i].time_10086) + " (" + PING_10086 + "%)";
-                // 每条线路一个标签：绿 <200ms，橙 200~300ms 或丢包 >=10%，红 >=300ms 或丢包 >=20%，灰 无数据
-                var pv = function(label, t, loss) {
-                    var cls = t <= 0 ? "none" : (t >= 300 || loss >= 20) ? "bad" : (t >= 200 || loss >= 10) ? "mid" : "";
-                    return "<span class=\"pv " + cls + "\" title=\"" + label + " 丢包 " + loss + "%\">" + (t > 0 ? t + "ms" : "-") + "</span>";
-                };
+                // 三网丢包：显示 vps789 24 小时 ping 图标签，悬停弹出完整图片；未设置时显示灰色标签
+                var p24 = result.servers[i].ping24h;
                 TableRow.children["ping"].children[0].className = "progress ping-wrap";
                 TableRow.children["ping"].children[0].children[0].className = "progress-bar ping-bar";
                 TableRow.children["ping"].children[0].children[0].style.width = "100%";
-	            TableRow.children["ping"].children[0].children[0].innerHTML =
-					pv("联通", result.servers[i].time_10010, PING_10010) +
-					pv("电信", result.servers[i].time_189, PING_189) +
-					pv("移动", result.servers[i].time_10086, PING_10086);
+                setHtml(TableRow.children["ping"].children[0].children[0], p24 ?
+                    "<span class=\"pv p24\">24h丢包<img src=\"" + ping24hImg(p24) + "\" loading=\"lazy\" alt=\"\"></span>" :
+                    "<span class=\"pv none\" title=\"在主控运行 probe → 编辑节点 → 设置三网丢包图\">未设置</span>");
+                setHtml(ExpandRow[0].children["expand_ping24h"], p24 ?
+                    "<a href=\"https://vps789.com/ping24h/?id=" + encodeURIComponent(p24) + "\" target=\"_blank\">" +
+                    "<img class=\"p24-full\" src=\"" + ping24hImg(p24) + "\" loading=\"lazy\" alt=\"三网 24 小时 ping\"></a>" : "");
 
 				// Custom
 				if (result.servers[i].custom) {
@@ -358,6 +372,7 @@ function uptime() {
 				TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-error";
 				TableRow.children["ping"].children[0].children[0].style.width = "100%";
 				TableRow.children["ping"].children[0].children[0].innerHTML = "<small>错误</small>";
+				TableRow.children["ping"].children[0].children[0]._html = "";
 				if(ExpandRow.hasClass("in")) {
 					ExpandRow.collapse("hide");
 				}

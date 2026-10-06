@@ -41,6 +41,14 @@
 			.ping-bar .pv.mid  { background-image: linear-gradient(to bottom, #f0ad4e 0, #ec971f 100%); }
 			.ping-bar .pv.bad  { background-image: linear-gradient(to bottom, #d9534f 0, #c9302c 100%); }
 			.ping-bar .pv.none { background-image: linear-gradient(to bottom, #aaa 0, #888 100%); }
+			/* 三网 24 小时丢包图（vps789）：悬停弹出完整图片 */
+			.ping-bar .pv.p24 { position: relative; cursor: pointer; }
+			.ping-bar .pv.p24 img {
+				display: none; position: absolute; right: 0; top: 24px; z-index: 1000; width: 630px; max-width: 90vw;
+				border: 1px solid #ccc; border-radius: 4px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+			}
+			.ping-bar .pv.p24:hover img { display: block; }
+			#servers .expandRow .p24-full { max-width: 100%; margin-top: 5px; border-radius: 4px; }
 		</style>
 		<!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
 		<!--[if lt IE 9]>
@@ -103,7 +111,7 @@
 					<th id="cpu">🎯核芯</th>
 					<th id="ram">⚡️内存</th>
 					<th id="hdd">💾硬盘</th>
-					<th id="ping">🌐CU|CT|CM</th>
+					<th id="ping">🌐三网丢包</th>
 				</tr>
 				</thead>
 				<tbody id="servers">

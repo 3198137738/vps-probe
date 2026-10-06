@@ -117,7 +117,8 @@ class Store:
 
     def __init__(self):
         self.lock = threading.Lock()
-        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP}
+        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP,
+        #        "pg": vps789 三网 24 小时 ping 的 id}
         self.nodes = {}
         self.conns = {}     # id -> 当前连接对象
         self.removed = {}   # 已在主控删除的节点 id -> 删除时间，重连时通知客户端自行卸载
@@ -128,7 +129,8 @@ class Store:
             with open(NODES_FILE, encoding="utf-8") as f:
                 for nid, n in json.load(f).items():
                     self.nodes[nid] = {"s": n.get("s"), "d": n.get("d"), "t": n.get("t", 0),
-                                       "o": n.get("o", 0), "a": n.get("a", ""), "ip": n.get("ip", "")}
+                                       "o": n.get("o", 0), "a": n.get("a", ""), "ip": n.get("ip", ""),
+                                       "pg": n.get("pg", "")}
         except FileNotFoundError:
             pass
         except Exception as e:
@@ -240,6 +242,11 @@ class Store:
             self.nodes[nid]["a"] = name
             self.dirty = True
 
+    def set_ping24h(self, nid, pid):
+        with self.lock:
+            self.nodes[nid]["pg"] = pid
+            self.dirty = True
+
     def set_order(self, nid, order):
         with self.lock:
             self.nodes[nid]["o"] = order
@@ -253,7 +260,7 @@ class Store:
                      "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
                      "last": int(n["t"]), "os": n["s"][8] if n["s"] else "",
                      "latest": bool(n.get("sv")) and n.get("sv") == AGENTS[n.get("os", "linux")][1],
-                     "platform": n.get("os", "linux")}
+                     "platform": n.get("os", "linux"), "ping24h": n.get("pg", "")}
                     for nid, n in items]
 
     def cleanup(self):
@@ -322,6 +329,7 @@ class Store:
                     "load_1": d[1], "load_5": d[1], "load_15": d[1],
                     "ping_10010": d[19], "ping_189": d[21], "ping_10086": d[23],
                     "time_10010": max(d[18], 0), "time_189": max(d[20], 0), "time_10086": max(d[22], 0),
+                    "ping24h": n.get("pg", ""),  # vps789 三网 24 小时 ping 图 id，未设置为空
                     "tcp_count": d[13], "udp_count": d[14], "process_count": d[15], "thread_count": d[16],
                     "network_rx": d[2], "network_tx": d[3],
                     "network_in": d[4], "network_out": d[5],
@@ -542,7 +550,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
-        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update&id=..&name=..&order=..
+        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|ping24h|update&id=..&name=..&order=..&url=..
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
@@ -571,6 +579,13 @@ class WebHandler(BaseHTTPRequestHandler):
             STORE.delete(nid, uninstall=q.get("uninstall", "1") == "1")
         elif action == "rename" and q.get("name", "").strip():
             STORE.rename(nid, q["name"].strip()[:64])
+        elif action == "ping24h":
+            # 接受 vps789 返回的网页地址、图片地址或纯 id，留空为清除
+            v = q.get("url", "").strip()
+            m = re.search(r"(?:[?&]id=|/view/)([\w-]+)", v) or re.fullmatch(r"([\w-]*)", v)
+            if not m:
+                return {"ok": 0, "msg": "无法识别的 vps789 地址"}
+            STORE.set_ping24h(nid, m.group(1)[:64])
         elif action == "order" and q.get("order", "").lstrip("-").isdigit():
             STORE.set_order(nid, int(q["order"]))
         else:
