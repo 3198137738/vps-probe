@@ -426,6 +426,9 @@ class WebHandler(BaseHTTPRequestHandler):
         # 静态文件每次向服务端确认是否变化（未变化返回 304，几乎不耗流量），更新后立即生效
         st = os.stat(full)
         etag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
+        is_index = full.endswith("index.html")
+        if is_index:
+            etag = etag[:-1] + "-" + VERSION[:7] + '"'
         if self.headers.get("If-None-Match") == etag:
             self.send_response(304)
             self.send_header("ETag", etag)
@@ -434,6 +437,10 @@ class WebHandler(BaseHTTPRequestHandler):
             return
         with open(full, "rb") as f:
             data = f.read()
+        if is_index:
+            # 给脚本和样式加版本号，更新后浏览器不会继续使用缓存的旧文件
+            v = ("?v=" + VERSION[:7]).encode()
+            data = data.replace(b'.js"', b'.js' + v + b'"').replace(b'.css"', b'.css' + v + b'"')
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype.endswith("javascript"):
             ctype += "; charset=utf-8"
