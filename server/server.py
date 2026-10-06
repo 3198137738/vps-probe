@@ -53,6 +53,7 @@ DEFAULT_CONFIG = {
     "repo": "3198137738/vps-probe",
     "branch": "main",
     "gh_proxy": "",              # 下载文件用的 GitHub 加速前缀，如 https://ghproxy.net/
+    "sort": "name",              # 节点排序：name 按名称自动排序，manual 按手动设置的排序值
 }
 
 
@@ -134,6 +135,30 @@ class Store:
     def name_of(n):
         return n.get("a") or (n["s"][0] if n["s"] else "")
 
+    @staticmethod
+    def name_key(name):
+        """名称排序键：数字按大小，英文不分大小写，中文按拼音（GB2312 一级汉字按拼音编码，无需额外依赖）"""
+        key = []
+        for t in re.split(r"(\d+)", name.lower()):
+            if t.isdigit():
+                key.append((0, int(t), ""))
+                continue
+            for ch in t:
+                if ord(ch) < 128:
+                    key.append((1, 0, ch))
+                else:
+                    try:
+                        key.append((2, 0, ch.encode("gb2312").hex()))
+                    except UnicodeEncodeError:
+                        key.append((3, 0, ch))
+        return key
+
+    def sorted_items(self):
+        """节点排序（调用方需持有锁）：默认按名称，sort=manual 时按手动排序值"""
+        if CFG.get("sort", "name") == "manual":
+            return sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+        return sorted(self.nodes.items(), key=lambda x: self.name_key(self.name_of(x[1])))
+
     def save(self):
         with self.lock:
             if not self.dirty:
@@ -214,7 +239,7 @@ class Store:
     def admin_list(self):
         now = time.time()
         with self.lock:
-            items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+            items = self.sorted_items()
             return [{"id": nid, "name": self.name_of(n), "online": now - n["t"] < CFG["offline_timeout"],
                      "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
                      "last": int(n["t"]), "os": n["s"][8] if n["s"] else "",
@@ -238,7 +263,7 @@ class Store:
             return self.cache[1], self.cache[2]
         timeout = CFG["offline_timeout"]
         with self.lock:
-            items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+            items = self.sorted_items()
             out = []
             for nid, n in items:
                 if not n["s"]:
@@ -260,7 +285,7 @@ class Store:
         timeout = CFG["offline_timeout"]
         servers = []
         with self.lock:
-            items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+            items = self.sorted_items()
             for _, n in items:
                 s, d = n["s"], n["d"]
                 if not s:

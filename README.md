@@ -83,6 +83,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 | `gh_proxy` | 空 | 主控下载 GitHub 文件用的加速前缀 |
 | `public_host` | 自动检测 | 主控对外地址，用于生成节点安装命令 |
 | `remove_offline_days` | 0 | 离线超过 N 天自动删除，0 为不删除 |
+| `sort` | name | 节点排序：`name` 按名称自动排序（英文字母序、中文拼音序、数字按大小），`manual` 按手动排序值 |
 
 建议通过 `probe set` 修改，保存后自动重启主控；客户端会自动重连并获取新配置。
 

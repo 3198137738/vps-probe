@@ -427,13 +427,14 @@ menu_edit() {
   pick_node || return 1
   echo
   echo " 1. 修改名称"
-  echo " 2. 修改排序（数字越小越靠前）"
+  echo " 2. 修改排序（数字越小越靠前，仅「手动排序」模式生效）"
   echo " 0. 返回"
   local r v
   case "$(ask "请选择: ")" in
     1) v="$(ask "新名称: " "$PICK_NAME")"
        r="$(pyapi rename id="$PICK_ID" name="$v")" ;;
-    2) v="$(ask "排序数字: ")"
+    2) [ "$(cfg_get sort)" = "manual" ] || yellow "当前为按名称自动排序，排序数字需在「修改设置 → 节点排序方式」切换为手动后才生效"
+       v="$(ask "排序数字: ")"
        r="$(pyapi order id="$PICK_ID" order="$v")" ;;
     *) return 0 ;;
   esac
@@ -457,9 +458,10 @@ show_info() {
 
 menu_settings() {
   need_installed || return 1
-  local v changed=0 auto agent_auto
+  local v changed=0 auto agent_auto sort
   while true; do
     auto="$(cfg_get auto_update)"; agent_auto="$(cfg_get agent_auto_update)"
+    sort="$(cfg_get sort)"; [ "$sort" = "manual" ] && sort="手动排序" || sort="按名称自动排序"
     echo
     echo " 1. 网页标题          [$(cfg_get title)]"
     echo " 2. 对外地址          [$(cfg_get public_host)]（用于生成节点安装命令）"
@@ -474,6 +476,7 @@ menu_settings() {
     echo "11. 检查更新间隔(秒)  [$(cfg_get update_interval)]"
     echo "12. GitHub 加速前缀   [$(cfg_get gh_proxy)]"
     echo "13. 离线自动删除(天)  [$(cfg_get remove_offline_days)]（0 为不删除）"
+    echo "14. 节点排序方式      [$sort]"
     echo " 0. 保存并返回"
     case "$(ask "请选择: ")" in
       1) v="$(ask "网页标题: " "$(cfg_get title)")"; cfg_set title "$v"; changed=1 ;;
@@ -503,6 +506,7 @@ menu_settings() {
           [ "$v" = "-" ] && v=""; cfg_set gh_proxy "$v"; changed=1 ;;
       13) v="$(ask "离线自动删除(天): " "$(cfg_get remove_offline_days)")"
           [[ "$v" =~ ^[0-9]+$ ]] && { cfg_set remove_offline_days "$v" int; changed=1; } ;;
+      14) [ "$(cfg_get sort)" = "manual" ] && cfg_set sort name || cfg_set sort manual; changed=1 ;;
       0|"") break ;;
     esac
   done
