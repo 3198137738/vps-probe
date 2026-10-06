@@ -197,7 +197,6 @@ function uptime() {
 						"<div id=\"expand_ping\">加载中</div>" +
 						"<div id=\"expand_custom\">加载中</div>" +
 						"<div id=\"expand_cpu\">加载中</div>" +
-						"<div id=\"expand_ping24h\"></div>" +
 					"</div></td></tr>"
 				);
 				TableRow = $("#servers tr#r" + i);
@@ -388,7 +387,7 @@ function uptime() {
 					ms(result.servers[i].time_10010) + " (" + PING_10010 + "%) / " +
 					ms(result.servers[i].time_189) + " (" + PING_189 + "%) / " +
 					ms(result.servers[i].time_10086) + " (" + PING_10086 + "%)";
-                // 三网实时丢包率（原版样式），任一线路 >= 20% 时变色；悬停弹出 24 小时丢包图，展开详情中也显示
+                // 三网实时丢包率（原版样式），任一线路 >= 20% 时变色；悬停弹出 24 小时丢包图
                 var bar = TableRow.children["ping"].children[0].children[0];
                 TableRow.children["ping"].children[0].className = "progress";
                 if (PING_10010 >= 20 || PING_189 >= 20 || PING_10086 >= 20)
@@ -407,7 +406,6 @@ function uptime() {
                 if (sum.some(function(x) { return x[0] >= 0; }))
                     chart = p24Chart(rows, sum);
                 setHtml(bar.children[1], chart);
-                setHtml(ExpandRow[0].children["expand_ping24h"], chart);
 
 				// Custom
 				if (result.servers[i].custom) {
