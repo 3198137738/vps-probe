@@ -50,6 +50,16 @@ function bytesToSize(bytes, precision, si)
 	}*/
 }
 
+// Unix 时间戳格式化为本地时间 YYYY-MM-DD HH:MM:SS
+function formatTime(ts) {
+	if (!ts)
+		return "–";
+	var t = new Date(ts * 1000);
+	var p = function(n) { return (n < 10 ? "0" : "") + n; };
+	return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + " " +
+		p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds());
+}
+
 // 位置显示为国旗（两位国家代码），图片加载失败时回退为文字
 function flagImg(cc) {
 	if (!/^[a-zA-Z]{2}$/.test(cc || ""))
@@ -98,6 +108,7 @@ function uptime() {
 						"<td id=\"ping\"><div class=\"progress\"><div style=\"width: 100%;\" class=\"progress-bar progress-bar-warning\"><small>加载中</small></div></div></td>" +
 					"</tr>" +
 					"<tr class=\"expandRow " + hack + "\"><td colspan=\"16\"><div class=\"accordian-body collapse\" id=\"rt" + i + "\">" +
+						"<div id=\"expand_boot\">加载中</div>" +
 						"<div id=\"expand_mem\">加载中</div>" +
 						"<div id=\"expand_swap\">加载中</div>" +
 						"<div id=\"expand_hdd\">加载中</div>" +
@@ -143,6 +154,7 @@ function uptime() {
 			if (!result.servers[i].online4 && !result.servers[i].online6) {
 				if (server_status[i]) {
 					TableRow.children["uptime"].innerHTML = "–";
+					TableRow.children["uptime"].title = "";
 					TableRow.children["load"].innerHTML = "–";
 					TableRow.children["network"].innerHTML = "–";
 					TableRow.children["traffic"].innerHTML = "–";
@@ -191,6 +203,10 @@ function uptime() {
 
 				// Uptime
 				TableRow.children["uptime"].innerHTML = result.servers[i].uptime;
+				// 启动时间：鼠标悬停在线时长可查看，展开详情中也显示
+				var boot = formatTime(result.servers[i].boot_time);
+				TableRow.children["uptime"].title = "启动于 " + boot;
+				ExpandRow[0].children["expand_boot"].innerHTML = "启动时间: " + boot;
 
 				// Load: default load_1, you can change show: load_1, load_5, load_15
 				if(result.servers[i].load == -1) {

@@ -305,12 +305,20 @@ class Store:
                 proto = s[3] if online else ""
                 up = int(d[17])
                 days = up // 86400
+                # 启动时间 = 最后上报时间 - 在线时长；上报时刻有秒级抖动，误差 3 秒内沿用上次结果，避免页面跳动
+                boot = 0
+                if online and up > 0:
+                    boot = int(n["t"]) - up
+                    if n.get("bt") and abs(boot - n["bt"]) <= 3:
+                        boot = n["bt"]
+                    n["bt"] = boot
                 servers.append({
                     "name": self.name_of(n), "type": s[1], "host": s[0], "location": s[2],
                     "online4": online and ("4" in proto or not proto),
                     "online6": online and "6" in proto,
                     "uptime": "%d 天" % days if days > 0 else
                               "%02d:%02d:%02d" % (up // 3600, up // 60 % 60, up % 60),
+                    "boot_time": boot,           # Unix 时间戳，前端按浏览器时区显示
                     "load_1": d[1], "load_5": d[1], "load_15": d[1],
                     "ping_10010": d[19], "ping_189": d[21], "ping_10086": d[23],
                     "time_10010": max(d[18], 0), "time_189": max(d[20], 0), "time_10086": max(d[22], 0),
