@@ -16,6 +16,9 @@ SERVER=""; PORT="35688"; TOKEN=""; NAME=""; RESET_DAY="1"; UNINSTALL=0
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 
+# 任何一步意外出错都给出提示，避免无声退出
+trap 'red "安装失败（install.sh 第 $LINENO 行出错），请把以上输出发给维护者"' ERR
+
 while getopts "s:p:t:n:r:u" opt; do
   case "$opt" in
     s) SERVER="$OPTARG" ;;
@@ -49,9 +52,16 @@ uninstall() {
 
 if [ "$UNINSTALL" = "1" ]; then uninstall; exit 0; fi
 
+# 上次安装中断可能留下损坏的配置，备份后按全新安装处理
+if [ -f "$DIR/config.json" ] && command -v python3 >/dev/null 2>&1 &&
+   ! python3 -c "import json,sys;json.load(open(sys.argv[1],encoding='utf-8'))" "$DIR/config.json" 2>/dev/null; then
+  mv -f "$DIR/config.json" "$DIR/config.json.broken"
+  echo "检测到损坏的旧配置，已备份为 $DIR/config.json.broken，将重新生成"
+fi
+
 # 读取已有配置，重复运行时可只修改名称
 if [ -f "$DIR/config.json" ] && command -v python3 >/dev/null 2>&1; then
-  getcfg() { python3 -c "import json,sys;print(json.load(open('$DIR/config.json')).get(sys.argv[1],''))" "$1" 2>/dev/null; }
+  getcfg() { python3 -c "import json,sys;print(json.load(open('$DIR/config.json',encoding='utf-8')).get(sys.argv[1],''))" "$1" 2>/dev/null || true; }
   [ -z "$SERVER" ] && SERVER="$(getcfg server)"
   [ -z "$TOKEN" ] && TOKEN="$(getcfg token)"
   [ "$PORT" = "35688" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
@@ -90,7 +100,9 @@ fi
 # 安装前先检查能否连上主控并通过认证，避免装完才发现节点不显示
 green "正在检查主控连接 $SERVER:$PORT ..."
 OLD_ID=""
-[ -f "$DIR/config.json" ] && OLD_ID="$(python3 -c "import json;print(json.load(open('$DIR/config.json')).get('id',''))" 2>/dev/null)"
+if [ -f "$DIR/config.json" ]; then
+  OLD_ID="$(python3 -c "import json;print(json.load(open('$DIR/config.json',encoding='utf-8')).get('id',''))" 2>/dev/null || true)"
+fi
 CHECK="$(python3 - "$SERVER" "$PORT" "$TOKEN" "$OLD_ID" <<'PYEOF'
 import json, socket, sys
 host, port, token, rid = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
@@ -162,8 +174,9 @@ if renew == "1":
 cfg.update({"server": server, "port": int(port), "token": token, "name": name,
             "reset_day": int(reset_day)})
 cfg.setdefault("id", uuid.uuid4().hex)
-with open(path, "w", encoding="utf-8") as f:
+with open(path + ".tmp", "w", encoding="utf-8") as f:   # 先写临时文件再替换，中断也不会损坏配置
     json.dump(cfg, f, ensure_ascii=False, indent=2)
+os.replace(path + ".tmp", path)
 EOF
 chmod 600 "$DIR/config.json"
 
