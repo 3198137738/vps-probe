@@ -2,6 +2,7 @@
 # 新增前端或程序文件时在此追加一行，推送后主控会自动下载
 server/server.py
 server/files.txt
+probe.sh
 agent/agent.py
 server/web/index.html
 server/web/favicon.ico

@@ -89,25 +89,28 @@ fi
 
 # 安装前先检查能否连上主控并通过认证，避免装完才发现节点不显示
 green "正在检查主控连接 $SERVER:$PORT ..."
-CHECK="$(python3 - "$SERVER" "$PORT" "$TOKEN" <<'PYEOF'
+OLD_ID=""
+[ -f "$DIR/config.json" ] && OLD_ID="$(python3 -c "import json;print(json.load(open('$DIR/config.json')).get('id',''))" 2>/dev/null)"
+CHECK="$(python3 - "$SERVER" "$PORT" "$TOKEN" "$OLD_ID" <<'PYEOF'
 import json, socket, sys
-host, port, token = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+host, port, token, rid = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 try:
     s = socket.create_connection((host, port), timeout=8)
-    s.sendall((json.dumps({"t": token, "id": "install-check"}) + "\n").encode())
+    s.sendall((json.dumps({"t": token, "id": "install-check", "rid": rid}) + "\n").encode())
     raw = s.makefile("rb").readline(512)
 except Exception as e:
     print("conn %s" % e)
     sys.exit()
 try:
     r = json.loads(raw.decode())
-    print("ok" if r.get("ok") else "token" if "msg" in r else "proto " + raw[:120].decode("utf-8", "replace"))
+    print(("ok-removed" if r.get("removed") else "ok") if r.get("ok") else "token" if "msg" in r else "proto " + raw[:120].decode("utf-8", "replace"))
 except Exception:
     print("proto " + (raw[:120].decode("utf-8", "replace").strip() or "(无回应，连接被关闭)"))
 PYEOF
 )"
 case "$CHECK" in
   ok) green "主控连接正常" ;;
+  ok-removed) green "主控连接正常（本机曾被删除，将以新节点身份重新加入）"; RENEW_ID=1 ;;
   token) red "Token 错误，请核对主控机 /opt/probe-server/config.json 中的 token"; exit 1 ;;
   proto*) red "$SERVER:$PORT 的回应不是本探针主控：${CHECK#proto }"
      red "该端口可能被其它程序（如旧的 ServerStatus 探针）占用，或填错了端口"
@@ -128,13 +131,15 @@ mv "$DIR/agent.py.tmp" "$DIR/agent.py"
 chmod +x "$DIR/agent.py"
 
 # 写入配置（保留已有节点 ID，避免重装后变成新节点）
-python3 - "$DIR/config.json" "$SERVER" "$PORT" "$TOKEN" "$NAME" "$RESET_DAY" <<'EOF'
+python3 - "$DIR/config.json" "$SERVER" "$PORT" "$TOKEN" "$NAME" "$RESET_DAY" "${RENEW_ID:-0}" <<'EOF'
 import json, sys, uuid
-path, server, port, token, name, reset_day = sys.argv[1:]
+path, server, port, token, name, reset_day, renew = sys.argv[1:]
 try:
     cfg = json.load(open(path, encoding="utf-8"))
 except Exception:
     cfg = {}
+if renew == "1":
+    cfg.pop("id", None)
 cfg.update({"server": server, "port": int(port), "token": token, "name": name,
             "reset_day": int(reset_day)})
 cfg.setdefault("id", uuid.uuid4().hex)

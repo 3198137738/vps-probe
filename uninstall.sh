@@ -10,13 +10,13 @@ green() { printf '\033[32m%s\033[0m\n' "$*"; }
 
 SERVICES="probe-agent probe-server"
 DIRS="/opt/probe-agent /opt/probe-server"
-TMPS="/tmp/probe-install.sh /run/probe-agent.pid /run/probe-server.pid"
+TMPS="/usr/local/bin/probe /tmp/probe-install.sh /run/probe-agent.pid /run/probe-server.pid"
 
 if [ "$1" != "-y" ]; then
   echo "将删除本机上与探针有关的全部内容："
   echo "  服务：$SERVICES（systemd / OpenRC）"
   echo "  目录：$DIRS（包括配置、节点数据、流量统计）"
-  echo "  以及相关进程与 crontab 开机任务"
+  echo "  以及相关进程、crontab 开机任务和 probe 管理命令"
   printf '确认卸载？[y/N] '
   read -r ANS </dev/tty || ANS=""
   case "$ANS" in y|Y) ;; *) echo "已取消"; exit 0 ;; esac

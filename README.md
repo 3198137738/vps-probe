@@ -6,63 +6,67 @@
 
 ## 部署
 
-> 如果 fork 到自己的仓库，请把 `install.sh`、`install_server.sh` 中的 `REPO` 默认值改成你的仓库名（或执行时设置环境变量 `PROBE_REPO=用户/仓库`）。
-
-### 架构（重要）
-
 ```
 VPS-A ──┐
 VPS-B ──┼──►  主控服务器（网页面板，所有节点统一显示在这里）
 VPS-C ──┘
 ```
 
-- **主控只装一台**：在其中一台机器上运行 `install_server.sh`，它提供网页面板。
-- **其它 VPS 只装客户端**：运行 `install.sh`，`-s` 指向主控 IP。
-- 不要在每台 VPS 上都运行 `install_server.sh`，否则每台都会变成一个只显示自己的独立面板。已经装错的机器可用下方「一键卸载」清理干净，再按第 2 步重新添加。
-
-### 1. 安装服务端（仅主控机）
+**只需在主控机上运行一个脚本**，安装、添加/删除/编辑节点、设置、更新、卸载全部在菜单里完成：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install_server.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/probe.sh)
 ```
 
-安装时会询问是否同时监控本机，完成后输出监控页面地址和**添加其它节点的一键命令**。需放行端口 `8080`（网页）和 `35688`（上报）。
+选择「1. 安装主控」，完成后以后直接输入 `probe` 即可打开菜单。需在防火墙/安全组放行 TCP `8080`（网页）和 `35688`（上报）。
 
-### 2. 添加其它 VPS
+```
+=================== 云监控探针 · 主控管理 ===================
+ 主控：运行中   版本：9239046   在线节点：3/3
+ 面板：http://1.2.3.4:8080
+============================================================
+  1. 安装 / 重装主控
+  2. 立即更新（主控 + 网页 + 节点客户端）
+ ------------------ 节点 ------------------
+  3. 查看节点
+  4. 添加节点            ← SSH 远程安装 / 显示一键命令 / 监控本机
+  5. 删除节点            ← VPS 上的客户端会自动卸载
+  6. 编辑节点（改名 / 排序）
+ ------------------ 管理 ------------------
+  7. 查看 Token 与添加命令
+  8. 修改设置            ← 标题、端口、上报间隔、三网目标、自动更新、GitHub 加速等
+  9. 启动 / 停止 / 重启主控
+ 10. 查看日志
+ 11. 卸载                ← 可一并让所有节点自动卸载
+  0. 退出
+```
 
-在其它 VPS 上执行主控输出的命令，按提示输入服务器名称即可（不带参数运行时会逐项询问主控地址与 Token，并在安装前检查能否连上主控）：
+也可直接使用子命令：`probe install | update | list | add | del | edit | info | set | restart | logs | uninstall`。
+
+> 如果 fork 到自己的仓库，请把 `probe.sh`、`install.sh` 中的 `REPO` 默认值改成你的仓库名（或设置环境变量 `PROBE_REPO=用户/仓库`）。国内机器可在命令前加 `GH_PROXY=https://ghproxy.net/`。
+
+### 添加节点的方式
+
+- **SSH 远程安装（推荐）**：在菜单中输入 VPS 的 IP、SSH 端口、用户和名称，按提示输入密码即可，无需登录 VPS。非 root 用户需要免密 sudo。
+- **一键命令**：菜单显示命令，复制到 VPS 上执行，按提示输入服务器名称：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 服务端IP -p 35688 -t TOKEN
+bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 主控IP -p 35688 -t TOKEN
 ```
 
-| 参数 | 说明 |
+| `install.sh` 参数 | 说明 |
 | --- | --- |
-| `-n 名称` | 直接指定名称，不再询问；重复运行可改名（节点 ID 保持不变） |
+| `-n 名称` | 直接指定名称，不再询问 |
 | `-r 日期` | 月流量账单重置日，默认每月 1 日 |
 | `-u` | 卸载客户端 |
 
-国内机器访问 GitHub 困难时，可在命令前加 `GH_PROXY=https://ghproxy.net/`。
+### 在任意机器上彻底卸载
 
-### 一键卸载
-
-删除本机与探针有关的**所有文件、服务、进程和开机任务**（客户端、服务端都会清理）：
+删除本机与探针有关的所有文件、服务、进程、开机任务和 `probe` 命令（加 `-y` 跳过确认）：
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall.sh)
 ```
-
-加 `-y` 跳过确认。本机若是节点，卸载时会自动通知主控把它从面板中删除。
-
-会被清理的内容：`probe-agent` / `probe-server` 服务（systemd、OpenRC）、`/opt/probe-agent`、`/opt/probe-server`（含配置、节点数据、流量统计）、残留进程、crontab 开机任务、安装临时文件。
-
-### 手动删除节点
-
-```bash
-curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
-```
-
-也可在 `config.json` 中设置 `remove_offline_days` 自动清理长期离线节点。
 
 ## 配置（`/opt/probe-server/config.json`）
 
@@ -77,8 +81,10 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 | `auto_update` / `update_interval` | true / 600 | 主控自动从 GitHub 更新 / 检查间隔（秒） |
 | `agent_auto_update` | true | 节点自动从主控获取新版客户端 |
 | `gh_proxy` | 空 | 主控下载 GitHub 文件用的加速前缀 |
+| `public_host` | 自动检测 | 主控对外地址，用于生成节点安装命令 |
+| `remove_offline_days` | 0 | 离线超过 N 天自动删除，0 为不删除 |
 
-修改后执行 `systemctl restart probe-server`，客户端会自动重连并获取新配置。
+建议通过 `probe set` 修改，保存后自动重启主控；客户端会自动重连并获取新配置。
 
 ## 自动更新
 
@@ -97,7 +103,7 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 - 按默认 3 秒间隔，上报流量约 **200MB/月**；改为 `interval: 5` 约 120MB/月，`10` 约 60MB/月
 - 三网探测每 60 秒 3 次 TCP 握手，约 40MB/月
 - 国家/协议栈识别每 6 小时一次
-- 网页与接口 gzip 压缩，静态资源浏览器缓存 1 小时，标签页隐藏时自动停止刷新
+- 网页与接口 gzip 压缩，静态资源协商缓存（未变化返回 304），标签页隐藏时自动停止刷新
 
 ## 目录结构
 
@@ -105,7 +111,8 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 agent/agent.py        客户端
 server/server.py      服务端（TCP 上报 + HTTP 网页）
 server/web/           前端页面（ServerStatus 1.0.9，数据接口 /json/stats.json 由服务端转换提供）
-install.sh            客户端一键安装 / 卸载
-install_server.sh     服务端一键安装 / 卸载
+probe.sh              主控管理脚本（安装 / 更新 / 节点管理 / 设置 / 卸载）
+install.sh            节点客户端安装 / 卸载（由 probe.sh 远程调用或在 VPS 上执行）
+install_server.sh     兼容旧命令，等同于 probe.sh install
 uninstall.sh          一键彻底卸载（客户端 + 服务端）
 ```

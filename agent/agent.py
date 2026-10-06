@@ -397,6 +397,40 @@ class Pinger:
         return [ms, loss]
 
 
+# ---------------------------------------------------------------- 被主控删除后自行卸载
+
+def self_uninstall():
+    """删除服务、开机任务和安装目录。卸载脚本放到服务之外运行，避免停止服务时被一起结束"""
+    log("本节点已在主控中删除，开始自行卸载")
+    d = BASE_DIR
+    script = """sleep 2
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl disable --now probe-agent >/dev/null 2>&1
+  rm -f /etc/systemd/system/probe-agent.service
+  systemctl daemon-reload >/dev/null 2>&1
+fi
+if [ -f /etc/init.d/probe-agent ]; then
+  rc-service probe-agent stop >/dev/null 2>&1; rc-update del probe-agent default >/dev/null 2>&1
+  rm -f /etc/init.d/probe-agent
+fi
+if crontab -l 2>/dev/null | grep -q '%(d)s/'; then
+  crontab -l 2>/dev/null | grep -v '%(d)s/' | crontab -
+fi
+pkill -f '%(d)s/agent.py'
+rm -rf '%(d)s'
+""" % {"d": d}
+    import shutil
+    import subprocess
+    if shutil.which("systemd-run") and os.path.isdir("/run/systemd/system"):
+        cmd = ["systemd-run", "--quiet", "--unit", "probe-agent-remove-%d" % time.time(), "/bin/sh", "-c", script]
+    else:
+        cmd = ["/bin/sh", "-c", script]
+    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+    while True:   # 等待被卸载脚本结束
+        time.sleep(60)
+
+
 # ---------------------------------------------------------------- 主循环
 
 class Agent:
@@ -504,6 +538,8 @@ class Agent:
             sock.sendall((json.dumps(auth, separators=(",", ":")) + "\n").encode())
             resp = json.loads(f.readline(65536).decode() or "{}")
             if not resp.get("ok"):
+                if resp.get("msg") == "removed":
+                    self_uninstall()
                 log("认证失败:", resp.get("msg", "未知错误"))
                 time.sleep(60)
                 return

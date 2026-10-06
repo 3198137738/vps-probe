@@ -29,6 +29,7 @@ DATA_DIR = os.environ.get("PROBE_DATA", BASE_DIR)
 WEB_DIR = os.path.join(BASE_DIR, "web")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
+REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
 VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
@@ -107,8 +108,10 @@ class Store:
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.nodes = {}   # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序}
-        self.conns = {}   # id -> 当前连接对象
+        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP}
+        self.nodes = {}
+        self.conns = {}     # id -> 当前连接对象
+        self.removed = {}   # 已在主控删除的节点 id -> 删除时间，重连时通知客户端自行卸载
         self.dirty = False
         self.cache = (0, b"", b"")
         self.ss_cache = (0, b"", b"")
@@ -116,28 +119,45 @@ class Store:
             with open(NODES_FILE, encoding="utf-8") as f:
                 for nid, n in json.load(f).items():
                     self.nodes[nid] = {"s": n.get("s"), "d": n.get("d"), "t": n.get("t", 0),
-                                       "o": n.get("o", 0)}
+                                       "o": n.get("o", 0), "a": n.get("a", ""), "ip": n.get("ip", "")}
         except FileNotFoundError:
             pass
         except Exception as e:
             log("读取节点数据失败:", e)
+        try:
+            with open(REMOVED_FILE, encoding="utf-8") as f:
+                self.removed = json.load(f)
+        except Exception:
+            pass
+
+    @staticmethod
+    def name_of(n):
+        return n.get("a") or (n["s"][0] if n["s"] else "")
 
     def save(self):
         with self.lock:
             if not self.dirty:
                 return
             self.dirty = False
-            data = json.dumps(self.nodes, ensure_ascii=False, separators=(",", ":"))
-        tmp = NODES_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(data)
-        os.replace(tmp, NODES_FILE)
+            # 已删除名单保留 90 天
+            limit = time.time() - 90 * 86400
+            self.removed = {k: v for k, v in self.removed.items() if v > limit}
+            files = ((NODES_FILE, json.dumps(self.nodes, ensure_ascii=False, separators=(",", ":"))),
+                     (REMOVED_FILE, json.dumps(self.removed)))
+        for path, data in files:
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(data)
+            os.replace(tmp, path)
 
-    def touch(self, nid):
+    def touch(self, nid, ip=""):
         with self.lock:
             if nid not in self.nodes:
                 order = max([n["o"] for n in self.nodes.values()] or [0]) + 1
-                self.nodes[nid] = {"s": None, "d": None, "t": 0, "o": order}
+                self.nodes[nid] = {"s": None, "d": None, "t": 0, "o": order, "a": "", "ip": ip}
+                self.dirty = True
+            elif ip and self.nodes[nid].get("ip") != ip:
+                self.nodes[nid]["ip"] = ip
                 self.dirty = True
 
     def update(self, nid, msg):
@@ -153,12 +173,15 @@ class Store:
                 n["d"] = msg[1:]
                 n["t"] = time.time()
 
-    def delete(self, key):
+    def delete(self, key, uninstall=False):
+        """删除节点；uninstall=True 时记入已删除名单，客户端重连时会自行卸载"""
         with self.lock:
             ids = [nid for nid, n in self.nodes.items()
-                   if nid == key or (n["s"] and n["s"][0] == key)]
+                   if nid == key or (n["s"] and self.name_of(n) == key)]
             for nid in ids:
                 del self.nodes[nid]
+                if uninstall:
+                    self.removed[nid] = time.time()
                 c = self.conns.pop(nid, None)
                 if c:
                     try:
@@ -168,6 +191,33 @@ class Store:
             if ids:
                 self.dirty = True
             return len(ids)
+
+    def find(self, key):
+        """按完整 ID、ID 前缀或名称查找节点"""
+        with self.lock:
+            if key in self.nodes:
+                return key
+            hits = [nid for nid, n in self.nodes.items() if nid.startswith(key) or self.name_of(n) == key]
+            return hits[0] if len(hits) == 1 else None
+
+    def rename(self, nid, name):
+        with self.lock:
+            self.nodes[nid]["a"] = name
+            self.dirty = True
+
+    def set_order(self, nid, order):
+        with self.lock:
+            self.nodes[nid]["o"] = order
+            self.dirty = True
+
+    def admin_list(self):
+        now = time.time()
+        with self.lock:
+            items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
+            return [{"id": nid, "name": self.name_of(n), "online": now - n["t"] < CFG["offline_timeout"],
+                     "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
+                     "last": int(n["t"]), "os": n["s"][8] if n["s"] else ""}
+                    for nid, n in items]
 
     def cleanup(self):
         days = CFG.get("remove_offline_days") or 0
@@ -192,7 +242,8 @@ class Store:
                 if not n["s"]:
                     continue
                 online = now - n["t"] < timeout
-                out.append({"id": nid[:8], "on": online, "s": n["s"], "d": n["d"], "t": int(n["t"])})
+                out.append({"id": nid[:8], "on": online, "s": [self.name_of(n)] + n["s"][1:],
+                            "d": n["d"], "t": int(n["t"])})
         body = json.dumps({"title": CFG["title"], "now": int(now), "nodes": out},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         gz = gzip.compress(body, 6)
@@ -218,7 +269,7 @@ class Store:
                 up = int(d[17])
                 days = up // 86400
                 servers.append({
-                    "name": s[0], "type": s[1], "host": s[0], "location": s[2],
+                    "name": self.name_of(n), "type": s[1], "host": s[0], "location": s[2],
                     "online4": online and ("4" in proto or not proto),
                     "online6": online and "6" in proto,
                     "uptime": "%d 天" % days if days > 0 else
@@ -266,18 +317,25 @@ class AgentHandler(socketserver.StreamRequestHandler):
             self.wfile.write(b'{"ok":0,"msg":"token error"}\n')
             log("认证失败:", peer)
             return
+        if nid in STORE.removed:   # 已在主控删除：通知客户端自行卸载
+            self.wfile.write(b'{"ok":0,"msg":"removed"}\n')
+            log("已删除的节点尝试连接，已通知其卸载:", nid[:8], peer)
+            return
         if auth.get("up"):   # 客户端请求下载新版 agent.py
             self.wfile.write((json.dumps({"ok": 1, "agent": AGENT_SRC}) + "\n").encode())
             log("节点下载新版客户端:", nid[:8], peer)
             return
         resp = {"ok": 1, "i": CFG["interval"], "p": CFG["ping"],
                 "pi": CFG["ping_interval"], "pw": CFG["ping_window"]}
+        if nid == "install-check":
+            # 告知安装脚本原节点 ID 是否已被删除，以便重新生成 ID
+            resp["removed"] = str(auth.get("rid", "")) in STORE.removed
         if CFG.get("agent_auto_update") and AGENT_SHA:
             resp["av"] = AGENT_SHA
         self.wfile.write((json.dumps(resp) + "\n").encode())
         if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
             return
-        STORE.touch(nid)
+        STORE.touch(nid, peer[7:] if peer.startswith("::ffff:") else peer)
         with STORE.lock:
             old = STORE.conns.get(nid)
             STORE.conns[nid] = sock
@@ -385,15 +443,41 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
+        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update&id=..&name=..&order=..
         url = urlparse(self.path)
-        q = parse_qs(url.query)
-        if url.path != "/api/delete":
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path not in ("/api/delete", "/api/admin"):
             return self.send(404, b'{"ok":0}')
-        if not secrets.compare_digest(q.get("token", [""])[0], CFG["token"]):
+        if not secrets.compare_digest(q.get("token", ""), CFG["token"]):
             return self.send(403, b'{"ok":0,"msg":"token error"}')
-        n = STORE.delete(q.get("name", [""])[0])
+        if url.path == "/api/delete":
+            n = STORE.delete(q.get("name", ""))
+            STORE.save()
+            return self.send(200, json.dumps({"ok": 1, "deleted": n}).encode())
+        self.send(200, json.dumps(self.admin(q), ensure_ascii=False).encode("utf-8"))
+
+    def admin(self, q):
+        action = q.get("action", "")
+        if action == "list":
+            return {"ok": 1, "nodes": STORE.admin_list(), "version": VERSION}
+        if action == "update":
+            if VERSION == "dev":
+                return {"ok": 0, "msg": "源码运行模式不支持自动更新"}
+            threading.Thread(target=run_update, daemon=True).start()
+            return {"ok": 1}
+        nid = STORE.find(q.get("id", ""))
+        if not nid:
+            return {"ok": 0, "msg": "节点不存在"}
+        if action == "delete":
+            STORE.delete(nid, uninstall=q.get("uninstall", "1") == "1")
+        elif action == "rename" and q.get("name", "").strip():
+            STORE.rename(nid, q["name"].strip()[:64])
+        elif action == "order" and q.get("order", "").lstrip("-").isdigit():
+            STORE.set_order(nid, int(q["order"]))
+        else:
+            return {"ok": 0, "msg": "参数错误"}
         STORE.save()
-        self.send(200, json.dumps({"ok": 1, "deleted": n}).encode())
+        return {"ok": 1}
 
 
 class WebServer(DualStackMixin, ThreadingHTTPServer):
@@ -453,6 +537,13 @@ def check_update():
     log("更新完成，重启主控")
     STORE.save()
     os.execv(sys.executable, [sys.executable, "-u", os.path.join(BASE_DIR, "server.py")])
+
+
+def run_update():
+    try:
+        check_update()
+    except Exception as e:
+        log("检查更新失败:", e)
 
 
 def update_loop():
