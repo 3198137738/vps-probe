@@ -25,31 +25,15 @@
 				padding-top: 70px;
 				padding-bottom: 30px;
 			}
-			/* 三网延迟：三个独立圆角标签，按延迟/丢包分别着色 */
-			#servers td#ping { min-width: 170px; }
-			#servers td#ping .progress.ping-wrap { background: none; box-shadow: none; overflow: visible; }
-			#servers td#ping .progress-bar.ping-bar {
-				display: flex; background: none; box-shadow: none; text-shadow: none;
-			}
-			.ping-bar .pv {
-				flex: 1; margin-left: 3px; border-radius: 4px; color: #fff; font-size: 12px; line-height: 20px;
-				white-space: nowrap; text-shadow: 0 -1px 0 rgba(0,0,0,.2);
-				box-shadow: inset 0 -1px 0 rgba(0,0,0,.15);
-				background-image: linear-gradient(to bottom, #5cb85c 0, #449d44 100%);
-			}
-			.ping-bar .pv:first-child { margin-left: 0; }
-			.ping-bar .pv.mid  { background-image: linear-gradient(to bottom, #f0ad4e 0, #ec971f 100%); }
-			.ping-bar .pv.bad  { background-image: linear-gradient(to bottom, #d9534f 0, #c9302c 100%); }
-			.ping-bar .pv.none { background-image: linear-gradient(to bottom, #aaa 0, #888 100%); }
-			.ping-bar .pv.dead { background-image: linear-gradient(to bottom, #a52a2a 0, #8b1a1a 100%); }
-			/* 三网 24 小时丢包图：表格中悬停弹出，展开详情中直接显示 */
-			#servers td#ping .progress-bar.ping-bar { position: relative; overflow: visible; }
-			.ping-bar .p24-pop {
+			/* 三网 24 小时丢包图：悬停三网列弹出，展开详情中直接显示 */
+			#servers td#ping .progress { overflow: visible; }
+			#servers td#ping .progress-bar { position: relative; }
+			#servers td#ping .p24-pop {
 				display: none; position: absolute; right: 0; top: 24px; z-index: 1000;
-				background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px;
+				background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px; text-shadow: none;
 				box-shadow: 0 4px 12px rgba(0,0,0,.3); padding: 8px 12px;
 			}
-			.ping-bar:hover .p24-pop { display: block; }
+			#servers td#ping .progress-bar:hover .p24-pop:not(:empty) { display: block; }
 			.p24 { width: 600px; max-width: 90vw; font-size: 12px; line-height: 1.5; text-align: left; display: inline-block; }
 			.p24-head { font-weight: bold; margin-bottom: 6px; }
 			.p24-head span { font-weight: normal; color: #888; margin-left: 8px; }
@@ -130,7 +114,7 @@
 					<th id="cpu">🎯核芯</th>
 					<th id="ram">⚡️内存</th>
 					<th id="hdd">💾硬盘</th>
-					<th id="ping">🌐三网丢包</th>
+					<th id="ping">🌐CU|CT|CM</th>
 				</tr>
 				</thead>
 				<tbody id="servers">

@@ -255,7 +255,7 @@ function uptime() {
 					TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-danger";
 					TableRow.children["ping"].children[0].children[0].style.width = "100%";
 					TableRow.children["ping"].children[0].children[0].innerHTML = "<small>关闭</small>";
-					TableRow.children["ping"].children[0].children[0]._html = "";
+					TableRow.children["ping"].children[0].children[0]._p24 = false;
 					if(ExpandRow.hasClass("in")) {
 						ExpandRow.collapse("hide");
 					}
@@ -379,7 +379,7 @@ function uptime() {
 
 				// tcp, udp, process, thread count
 				ExpandRow[0].children["expand_tupd"].innerHTML = "TCP/UDP/进/线: " + result.servers[i].tcp_count + " / " + result.servers[i].udp_count + " / " + result.servers[i].process_count+ " / " + result.servers[i].thread_count;
-                // ping：表格显示三网延迟，丢包率放在详情中；任一线路丢包 >= 20% 时变色提醒
+                // ping：三网实时丢包率（客户端最近一个探测窗口），详情中同时显示延迟
                 var PING_10010 = result.servers[i].ping_10010.toFixed(0);
                 var PING_189 = result.servers[i].ping_189.toFixed(0);
                 var PING_10086 = result.servers[i].ping_10086.toFixed(0);
@@ -388,25 +388,25 @@ function uptime() {
 					ms(result.servers[i].time_10010) + " (" + PING_10010 + "%) / " +
 					ms(result.servers[i].time_189) + " (" + PING_189 + "%) / " +
 					ms(result.servers[i].time_10086) + " (" + PING_10086 + "%)";
-                // 三网丢包：表格显示三条线路 24 小时平均丢包率，悬停弹出丢包图，展开详情中也显示
-                var rows = p24.data && p24.data.nodes[result.servers[i].id], cell = "", chart = "";
-                var sum = rows ? p24Summary(rows) : [];
-                if (sum.some(function(x) { return x[0] >= 0; })) {
-                    var pillCls = { c0: "", c1: "mid", c2: "bad", c3: "dead", cx: "none" };
-                    for (var k = 0; k < 3; k++) {
-                        var loss = sum[k][0];
-                        cell += loss < 0 ? "<span class=\"pv none\">" + P24_LINES[k].charAt(0) + " -</span>" :
-                            "<span class=\"pv " + pillCls[lossClass(loss)] + "\">" + P24_LINES[k].charAt(0) + " " + fmtLoss(loss) + "</span>";
-                    }
-                    chart = p24Chart(rows, sum);
-                    cell += "<div class=\"p24-pop\">" + chart + "</div>";
-                } else {
-                    cell = "<span class=\"pv none\" title=\"节点上线后自动记录三网丢包，约 20 分钟后显示\">收集中</span>";
+                // 三网实时丢包率（原版样式），任一线路 >= 20% 时变色；悬停弹出 24 小时丢包图，展开详情中也显示
+                var bar = TableRow.children["ping"].children[0].children[0];
+                TableRow.children["ping"].children[0].className = "progress";
+                if (PING_10010 >= 20 || PING_189 >= 20 || PING_10086 >= 20)
+                    bar.className = "progress-bar progress-bar-warning";
+                else
+                    bar.className = "progress-bar progress-bar-success";
+                bar.style.width = "100%";
+                // 文字与弹窗分开更新，数值变化时不会重建弹窗
+                if (!bar._p24) {
+                    bar.innerHTML = "<span></span><div class=\"p24-pop\"></div>";
+                    bar._p24 = true;
                 }
-                TableRow.children["ping"].children[0].className = "progress ping-wrap";
-                TableRow.children["ping"].children[0].children[0].className = "progress-bar ping-bar";
-                TableRow.children["ping"].children[0].children[0].style.width = "100%";
-                setHtml(TableRow.children["ping"].children[0].children[0], cell);
+                bar.children[0].textContent = PING_10010 + "%💻" + PING_189 + "%💻" + PING_10086 + "%";
+                var rows = p24.data && p24.data.nodes[result.servers[i].id], chart = "";
+                var sum = rows ? p24Summary(rows) : [];
+                if (sum.some(function(x) { return x[0] >= 0; }))
+                    chart = p24Chart(rows, sum);
+                setHtml(bar.children[1], chart);
                 setHtml(ExpandRow[0].children["expand_ping24h"], chart);
 
 				// Custom
@@ -449,7 +449,7 @@ function uptime() {
 				TableRow.children["ping"].children[0].children[0].className = "progress-bar progress-bar-error";
 				TableRow.children["ping"].children[0].children[0].style.width = "100%";
 				TableRow.children["ping"].children[0].children[0].innerHTML = "<small>错误</small>";
-				TableRow.children["ping"].children[0].children[0]._html = "";
+				TableRow.children["ping"].children[0].children[0]._p24 = false;
 				if(ExpandRow.hasClass("in")) {
 					ExpandRow.collapse("hide");
 				}
