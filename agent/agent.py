@@ -143,9 +143,39 @@ def os_name():
     return m.group(1) if m else sys.platform
 
 
+# ARM 处理器：(厂商编号, 型号编号) -> 名称，lscpu 不可用时兜底
+ARM_PARTS = {
+    ("0x41", "0xd03"): "Cortex-A53", ("0x41", "0xd05"): "Cortex-A55", ("0x41", "0xd07"): "Cortex-A57",
+    ("0x41", "0xd08"): "Cortex-A72", ("0x41", "0xd0b"): "Cortex-A76", ("0x41", "0xd0c"): "Neoverse-N1",
+    ("0x41", "0xd40"): "Neoverse-V1", ("0x41", "0xd49"): "Neoverse-N2", ("0x41", "0xd4f"): "Neoverse-V2",
+    ("0x48", "0xd01"): "Kunpeng-920", ("0xc0", "0xac3"): "Ampere-1", ("0xc0", "0xac4"): "Ampere-1a",
+}
+
+
 def cpu_model():
-    m = re.search(r"^model name\s*:\s*(.+)$", read_file("/proc/cpuinfo"), re.M)
-    return m.group(1).strip() if m else ""
+    """处理器型号：x86 读 model name；ARM 依次尝试 lscpu、型号编号对照、Hardware 字段"""
+    info = read_file("/proc/cpuinfo")
+    m = re.search(r"^model name\s*:\s*(.+)$", info, re.M)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()
+    try:
+        out = os.popen("LC_ALL=C lscpu 2>/dev/null").read()
+        name = re.search(r"^Model name:\s*(.+)$", out, re.M)
+        if name and name.group(1).strip() not in ("-", ""):
+            vendor = re.search(r"^Vendor ID:\s*(.+)$", out, re.M)
+            v = vendor.group(1).strip() if vendor else ""
+            return (v + " " + name.group(1).strip()).strip() if v and v not in name.group(1) else name.group(1).strip()
+    except Exception:
+        pass
+    imp = re.search(r"^CPU implementer\s*:\s*(\S+)$", info, re.M)
+    part = re.search(r"^CPU part\s*:\s*(\S+)$", info, re.M)
+    if imp and part and (imp.group(1), part.group(1)) in ARM_PARTS:
+        return ARM_PARTS[(imp.group(1), part.group(1))]
+    for key in ("Hardware", "Processor", "cpu model"):
+        m = re.search(r"^%s\s*:\s*(.+)$" % key, info, re.M)
+        if m:
+            return m.group(1).strip()
+    return read_file("/sys/firmware/devicetree/base/model").strip("\x00 \n")
 
 
 def meminfo():

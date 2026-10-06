@@ -236,8 +236,9 @@ class Store:
                     "swap_total": s[6] // 1024, "swap_used": d[9] // 1024,           # KB
                     "hdd_total": s[7] // 1048576, "hdd_used": d[10] // 1048576,      # MB
                     "io_read": d[11], "io_write": d[12],
-                    # 前端以 innerHTML 显示 custom，需转义
-                    "custom": html.escape("系统: %s (%s) | %s 核 %s" % (s[8], s[9], s[4], s[10])),
+                    # 前端以 innerHTML 显示，需转义
+                    "cpu_info": html.escape("%s | %s 核" % (s[10] or "未知", s[4])),
+                    "custom": html.escape("系统: %s (%s)" % (s[8], s[9])),
                 })
         body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7]},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
