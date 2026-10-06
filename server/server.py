@@ -150,7 +150,7 @@ class Store:
                 f.write(data)
             os.replace(tmp, path)
 
-    def touch(self, nid, ip=""):
+    def touch(self, nid, ip="", sv=""):
         with self.lock:
             if nid not in self.nodes:
                 order = max([n["o"] for n in self.nodes.values()] or [0]) + 1
@@ -159,6 +159,7 @@ class Store:
             elif ip and self.nodes[nid].get("ip") != ip:
                 self.nodes[nid]["ip"] = ip
                 self.dirty = True
+            self.nodes[nid]["sv"] = sv   # 客户端 agent.py 的 SHA256，旧版客户端为空
 
     def update(self, nid, msg):
         with self.lock:
@@ -216,7 +217,8 @@ class Store:
             items = sorted(self.nodes.items(), key=lambda x: x[1]["o"])
             return [{"id": nid, "name": self.name_of(n), "online": now - n["t"] < CFG["offline_timeout"],
                      "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
-                     "last": int(n["t"]), "os": n["s"][8] if n["s"] else ""}
+                     "last": int(n["t"]), "os": n["s"][8] if n["s"] else "",
+                     "latest": bool(AGENT_SHA) and n.get("sv") == AGENT_SHA}
                     for nid, n in items]
 
     def cleanup(self):
@@ -335,7 +337,7 @@ class AgentHandler(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps(resp) + "\n").encode())
         if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
             return
-        STORE.touch(nid, peer[7:] if peer.startswith("::ffff:") else peer)
+        STORE.touch(nid, peer[7:] if peer.startswith("::ffff:") else peer, str(auth.get("sv", "")))
         with STORE.lock:
             old = STORE.conns.get(nid)
             STORE.conns[nid] = sock

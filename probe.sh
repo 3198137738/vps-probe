@@ -158,16 +158,19 @@ if cmd in ("table", "ids", "summary"):
     elif not nodes:
         print("（暂无节点）")
     else:
-        rows = [("序号", "名称", "状态", "位置", "IP", "排序", "系统", "ID")]
+        rows = [("序号", "名称", "状态", "位置", "IP", "排序", "系统", "客户端", "ID")]
         for i, n in enumerate(nodes, 1):
             st = "在线" if n["online"] else ("离线(%s)" % ago(n["last"]) if n["last"] else "未上报")
             rows.append((str(i), n["name"] or "-", st, (n["cc"] or "-").upper(), n["ip"] or "-",
-                         str(n["order"]), n["os"] or "-", n["id"][:8]))
+                         str(n["order"]), n["os"] or "-", "最新" if n.get("latest") else "旧版", n["id"][:8]))
         ws = [max(width(row[k]) for row in rows) for k in range(len(rows[0]))]
         for j, row in enumerate(rows):
             line = "  ".join(pad(x, ws[k]) for k, x in enumerate(row))
             color = "1" if j == 0 else ("32" if nodes[j - 1]["online"] else "31")
             print("\033[%sm%s\033[0m" % (color, line))
+        if any(n["online"] and not n.get("latest") for n in nodes):
+            print("\n\033[33m提示：在线但显示「旧版」的节点通常会在重连时自动更新；若长时间仍为旧版，"
+                  "说明其客户端过旧不支持自动更新，请在「添加节点」中对该 VPS 重新安装一次（节点 ID 不变）\033[0m")
 else:
     kw = dict(a.split("=", 1) for a in args)
     r = call(cmd, **kw)

@@ -534,7 +534,7 @@ class Agent:
         sock = socket.create_connection((host, port), timeout=10)
         try:
             f = sock.makefile("rb")
-            auth = {"t": self.cfg["token"], "id": self.cfg["id"], "v": 1}
+            auth = {"t": self.cfg["token"], "id": self.cfg["id"], "v": 1, "sv": SELF_SHA}
             sock.sendall((json.dumps(auth, separators=(",", ":")) + "\n").encode())
             resp = json.loads(f.readline(65536).decode() or "{}")
             if not resp.get("ok"):

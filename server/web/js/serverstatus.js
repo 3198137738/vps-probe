@@ -98,13 +98,13 @@ function uptime() {
 						"<td id=\"ping\"><div class=\"progress\"><div style=\"width: 100%;\" class=\"progress-bar progress-bar-warning\"><small>加载中</small></div></div></td>" +
 					"</tr>" +
 					"<tr class=\"expandRow " + hack + "\"><td colspan=\"16\"><div class=\"accordian-body collapse\" id=\"rt" + i + "\">" +
-						"<div id=\"expand_cpu\">加载中</div>" +
 						"<div id=\"expand_mem\">加载中</div>" +
 						"<div id=\"expand_swap\">加载中</div>" +
 						"<div id=\"expand_hdd\">加载中</div>" +
 						"<div id=\"expand_tupd\">加载中</div>" +
 						"<div id=\"expand_ping\">加载中</div>" +
 						"<div id=\"expand_custom\">加载中</div>" +
+						"<div id=\"expand_cpu\">加载中</div>" +
 					"</div></td></tr>"
 				);
 				TableRow = $("#servers tr#r" + i);
