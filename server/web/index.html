@@ -26,8 +26,11 @@
 				padding-bottom: 30px;
 			}
 			/* 三网 24 小时丢包图：悬停三网列弹出，展开详情中直接显示 */
+			/* 为显示弹窗取消了外层裁剪，圆角和文字溢出需单独处理 */
+			#servers td#ping { min-width: 135px; }
 			#servers td#ping .progress { overflow: visible; }
-			#servers td#ping .progress-bar { position: relative; }
+			#servers td#ping .progress-bar { position: relative; border-radius: 4px; }
+			#servers td#ping .progress-bar > span { display: block; white-space: nowrap; overflow: hidden; }
 			#servers td#ping .p24-pop {
 				display: none; position: absolute; right: 0; top: 24px; z-index: 1000;
 				background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px; text-shadow: none;
