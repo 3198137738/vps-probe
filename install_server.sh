@@ -50,6 +50,46 @@ download "$RAW/server.py" "$DIR/server.py"
 for f in index.html style.css app.js; do download "$RAW/web/$f" "$DIR/web/$f"; done
 
 PY="$(command -v python3)"
+
+# 确定端口：已有配置 > 默认值，可用环境变量 PROBE_HTTP_PORT / PROBE_AGENT_PORT 覆盖，并写入配置
+read -r HTTP_PORT AGENT_PORT <<<"$(python3 - "$DIR/config.json" "${PROBE_HTTP_PORT:-}" "${PROBE_AGENT_PORT:-}" <<'PYEOF'
+import json, sys
+path, hp, ap = sys.argv[1:]
+try:
+    c = json.load(open(path, encoding="utf-8"))
+except Exception:
+    c = {}
+if hp: c["http_port"] = int(hp)
+if ap: c["agent_port"] = int(ap)
+# 旧版默认上报端口 35601 与 ServerStatus 冲突，自动迁移到新默认端口
+elif c.get("agent_port") == 35601: c["agent_port"] = 35688
+c.setdefault("http_port", 8080)
+c.setdefault("agent_port", 35688)
+json.dump(c, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+print(c["http_port"], c["agent_port"])
+PYEOF
+)"
+
+# 先停掉旧的主控，再检查端口是否被其它程序占用
+systemctl stop $SERVICE >/dev/null 2>&1 || true
+sleep 1
+BUSY=0
+for p in $HTTP_PORT $AGENT_PORT; do
+  if ! python3 -c "import socket,sys;s=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('0.0.0.0',int(sys.argv[1])))" "$p" 2>/dev/null; then
+    BUSY=1
+    red "端口 $p 已被其它程序占用："
+    command -v ss >/dev/null 2>&1 && ss -lntp 2>/dev/null | grep -E "[:.]$p\b" | sed 's/^/    /'
+  fi
+done
+if [ "$BUSY" = "1" ]; then
+  echo
+  echo "解决方法（二选一）："
+  echo "  1. 停掉占用端口的程序（例如旧的 ServerStatus 探针）后重新运行本脚本"
+  echo "  2. 换端口安装，例如："
+  echo "     PROBE_HTTP_PORT=8081 PROBE_AGENT_PORT=35602 bash <(curl -fsSL ${GH_PROXY}https://raw.githubusercontent.com/$REPO/$BRANCH/install_server.sh)"
+  exit 1
+fi
+
 cat > /etc/systemd/system/$SERVICE.service <<EOF
 [Unit]
 Description=Probe Server
@@ -68,9 +108,25 @@ systemctl daemon-reload
 systemctl enable $SERVICE >/dev/null 2>&1
 systemctl restart $SERVICE
 
-# 等待首次启动生成配置
-for _ in 1 2 3 4 5 6 7 8 9 10; do [ -f "$DIR/config.json" ] && break; sleep 1; done
-read -r TOKEN HTTP_PORT AGENT_PORT <<<"$(python3 -c "import json;c=json.load(open('$DIR/config.json'));print(c['token'],c['http_port'],c['agent_port'])")"
+# 等待主控启动并确认上报端口确实由本服务响应
+OK=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 1
+  TOKEN="$(python3 -c "import json;print(json.load(open('$DIR/config.json',encoding='utf-8')).get('token',''))" 2>/dev/null)"
+  [ -n "$TOKEN" ] || continue
+  if python3 - "$AGENT_PORT" "$TOKEN" 2>/dev/null <<'PYEOF'
+import json, socket, sys
+s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=3)
+s.sendall((json.dumps({"t": sys.argv[2], "id": "install-check"}) + "\n").encode())
+sys.exit(0 if json.loads(s.makefile("rb").readline().decode()).get("ok") else 1)
+PYEOF
+  then OK=1; break; fi
+done
+if [ "$OK" != "1" ]; then
+  red "主控启动失败，最近日志："
+  journalctl -u $SERVICE -n 15 --no-pager 2>/dev/null | sed 's/^/    /'
+  exit 1
+fi
 IP="$(curl -fsS4 --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | sed -n 's/^ip=//p')"
 [ -n "$IP" ] || IP="服务端IP"
 

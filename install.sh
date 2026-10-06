@@ -11,7 +11,7 @@ GH_PROXY="${GH_PROXY:-}"            # 国内机器可设置 GH_PROXY=https://ghp
 DIR="/opt/probe-agent"
 SERVICE="probe-agent"
 
-SERVER=""; PORT="35601"; TOKEN=""; NAME=""; RESET_DAY="1"; UNINSTALL=0
+SERVER=""; PORT="35688"; TOKEN=""; NAME=""; RESET_DAY="1"; UNINSTALL=0
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -54,7 +54,7 @@ if [ -f "$DIR/config.json" ] && command -v python3 >/dev/null 2>&1; then
   getcfg() { python3 -c "import json,sys;print(json.load(open('$DIR/config.json')).get(sys.argv[1],''))" "$1" 2>/dev/null; }
   [ -z "$SERVER" ] && SERVER="$(getcfg server)"
   [ -z "$TOKEN" ] && TOKEN="$(getcfg token)"
-  [ "$PORT" = "35601" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
+  [ "$PORT" = "35688" ] && [ -n "$(getcfg port)" ] && PORT="$(getcfg port)"
 fi
 
 ask() {  # ask 提示 变量名
@@ -95,15 +95,23 @@ host, port, token = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 try:
     s = socket.create_connection((host, port), timeout=8)
     s.sendall((json.dumps({"t": token, "id": "install-check"}) + "\n").encode())
-    r = json.loads(s.makefile("rb").readline().decode() or "{}")
-    print("ok" if r.get("ok") else "token")
+    raw = s.makefile("rb").readline(512)
 except Exception as e:
     print("conn %s" % e)
+    sys.exit()
+try:
+    r = json.loads(raw.decode())
+    print("ok" if r.get("ok") else "token" if "msg" in r else "proto " + raw[:120].decode("utf-8", "replace"))
+except Exception:
+    print("proto " + (raw[:120].decode("utf-8", "replace").strip() or "(无回应，连接被关闭)"))
 PYEOF
 )"
 case "$CHECK" in
   ok) green "主控连接正常" ;;
   token) red "Token 错误，请核对主控机 /opt/probe-server/config.json 中的 token"; exit 1 ;;
+  proto*) red "$SERVER:$PORT 的回应不是本探针主控：${CHECK#proto }"
+     red "该端口可能被其它程序（如旧的 ServerStatus 探针）占用，或填错了端口"
+     red "请在主控机执行 ss -lntp | grep $PORT 查看占用程序"; exit 1 ;;
   *) red "无法连接主控 $SERVER:$PORT（${CHECK#conn }）"
      red "请确认主控已安装服务端，且防火墙/安全组已放行 TCP $PORT 端口"; exit 1 ;;
 esac

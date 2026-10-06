@@ -50,7 +50,7 @@ if [ -f /opt/probe-agent/config.json ] && command -v python3 >/dev/null 2>&1; th
   python3 - /opt/probe-agent/config.json 2>/dev/null <<'PYEOF' && echo "已从主控面板中删除本节点" || echo "未能通知主控（可稍后在主控上调用 /api/delete 删除）"
 import json, socket, sys
 c = json.load(open(sys.argv[1], encoding="utf-8"))
-s = socket.create_connection((c["server"], int(c.get("port", 35601))), timeout=8)
+s = socket.create_connection((c["server"], int(c.get("port", 35688))), timeout=8)
 f = s.makefile("rb")
 s.sendall((json.dumps({"t": c["token"], "id": c["id"]}) + "\n").encode())
 if not json.loads(f.readline().decode() or "{}").get("ok"):

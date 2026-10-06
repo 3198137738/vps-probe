@@ -28,7 +28,7 @@ NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 DEFAULT_CONFIG = {
     "title": "云监控",
     "http_port": 8080,
-    "agent_port": 35601,
+    "agent_port": 35688,
     "token": "",
     "interval": 3,               # 客户端上报间隔（秒）
     "offline_timeout": 15,       # 超过该秒数未收到数据视为离线

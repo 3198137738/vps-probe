@@ -26,14 +26,14 @@ VPS-C ──┘
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install_server.sh)
 ```
 
-安装时会询问是否同时监控本机，完成后输出监控页面地址和**添加其它节点的一键命令**。需放行端口 `8080`（网页）和 `35601`（上报）。
+安装时会询问是否同时监控本机，完成后输出监控页面地址和**添加其它节点的一键命令**。需放行端口 `8080`（网页）和 `35688`（上报）。
 
 ### 2. 添加其它 VPS
 
 在其它 VPS 上执行主控输出的命令，按提示输入服务器名称即可（不带参数运行时会逐项询问主控地址与 Token，并在安装前检查能否连上主控）：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 服务端IP -p 35601 -t TOKEN
+bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/install.sh) -s 服务端IP -p 35688 -t TOKEN
 ```
 
 | 参数 | 说明 |
@@ -69,7 +69,7 @@ curl -X POST "http://127.0.0.1:8080/api/delete?token=TOKEN&name=节点名称"
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
 | `title` | 云监控 | 页面标题 |
-| `http_port` / `agent_port` | 8080 / 35601 | 网页端口 / 上报端口 |
+| `http_port` / `agent_port` | 8080 / 35688 | 网页端口 / 上报端口 |
 | `interval` | 3 | 客户端上报间隔（秒），下发给所有客户端 |
 | `offline_timeout` | 15 | 超过多少秒无数据判为离线 |
 | `ping_interval` / `ping_window` | 60 / 10 | 三网探测间隔（秒）/ 丢包统计次数 |

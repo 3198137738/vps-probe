@@ -435,7 +435,7 @@ class Agent:
         return d
 
     def run_once(self):
-        host, port = self.cfg["server"], int(self.cfg.get("port", 35601))
+        host, port = self.cfg["server"], int(self.cfg.get("port", 35688))
         log("连接服务端 %s:%s" % (host, port))
         sock = socket.create_connection((host, port), timeout=10)
         try:
