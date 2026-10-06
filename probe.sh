@@ -557,7 +557,6 @@ menu_edit() {
   echo
   echo " 1. 修改名称"
   echo " 2. 修改排序（数字越小越靠前，仅「手动排序」模式生效）"
-  echo " 3. 设置三网丢包图（vps789 24 小时 ping）"
   echo " 0. 返回"
   local r v
   case "$(ask "请选择: ")" in
@@ -566,12 +565,6 @@ menu_edit() {
     2) [ "$(cfg_get sort)" = "manual" ] || yellow "当前为按名称自动排序，排序数字需在「修改设置 → 节点排序方式」切换为手动后才生效"
        v="$(ask "排序数字: ")"
        r="$(pyapi order id="$PICK_ID" order="$v")" ;;
-    3) echo "打开 https://vps789.com/ping24h 提交本节点 IP，把提交后显示的网址或图片地址粘贴到这里"
-       echo "（每次提交持续测 24 小时；输入 - 清除）"
-       v="$(ask "vps789 地址: ")"
-       [ -n "$v" ] || { echo "已取消"; return 0; }
-       [ "$v" = "-" ] && v=""
-       r="$(pyapi ping24h id="$PICK_ID" url="$v")" ;;
     *) return 0 ;;
   esac
   [ "$r" = "ok" ] && green "已保存，网页即时生效" || red "$r"
@@ -739,7 +732,7 @@ main_menu() {
     echo "  3. 查看节点"
     echo "  4. 添加节点"
     echo "  5. 删除节点"
-    echo "  6. 编辑节点（改名 / 排序 / 丢包图）"
+    echo "  6. 编辑节点（改名 / 排序）"
     echo "  7. 批量更新旧版客户端"
     echo " ------------------ 管理 ------------------"
     echo "  8. 查看 Token 与添加命令"

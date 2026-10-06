@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import shlex
+import signal
 import socket
 import socketserver
 import sys
@@ -31,6 +32,10 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
+HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
+
+PING_STEP = 1200   # 三网 24 小时丢包图：每 20 分钟一格，共 72 格
+PING_SLOTS = 72
 VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
@@ -117,20 +122,22 @@ class Store:
 
     def __init__(self):
         self.lock = threading.Lock()
-        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP,
-        #        "pg": vps789 三网 24 小时 ping 的 id}
+        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP}
         self.nodes = {}
         self.conns = {}     # id -> 当前连接对象
         self.removed = {}   # 已在主控删除的节点 id -> 删除时间，重连时通知客户端自行卸载
+        # 三网历史 id -> {"cur": 当前格累计, "list": [[格起始时间, 联通丢包, 联通延迟, 电信.., .., 移动.., ..], ...]}
+        self.hist = {}
         self.dirty = False
+        self.hist_dirty = False
         self.cache = (0, b"", b"")
         self.ss_cache = (0, b"", b"")
+        self.hist_cache = (0, b"", b"")
         try:
             with open(NODES_FILE, encoding="utf-8") as f:
                 for nid, n in json.load(f).items():
                     self.nodes[nid] = {"s": n.get("s"), "d": n.get("d"), "t": n.get("t", 0),
-                                       "o": n.get("o", 0), "a": n.get("a", ""), "ip": n.get("ip", ""),
-                                       "pg": n.get("pg", "")}
+                                       "o": n.get("o", 0), "a": n.get("a", ""), "ip": n.get("ip", "")}
         except FileNotFoundError:
             pass
         except Exception as e:
@@ -138,6 +145,11 @@ class Store:
         try:
             with open(REMOVED_FILE, encoding="utf-8") as f:
                 self.removed = json.load(f)
+        except Exception:
+            pass
+        try:
+            with open(HISTORY_FILE, encoding="utf-8") as f:
+                self.hist = {k: v for k, v in json.load(f).items() if k in self.nodes}
         except Exception:
             pass
 
@@ -169,16 +181,22 @@ class Store:
             return sorted(self.nodes.items(), key=lambda x: x[1]["o"])
         return sorted(self.nodes.items(), key=lambda x: self.name_key(self.name_of(x[1])))
 
-    def save(self):
+    def save(self, final=False):
+        """落盘；final=True（退出 / 重启前）时连同三网历史中未满 20 分钟的当前格一起保存"""
+        files = []
         with self.lock:
-            if not self.dirty:
-                return
-            self.dirty = False
-            # 已删除名单保留 90 天
-            limit = time.time() - 90 * 86400
-            self.removed = {k: v for k, v in self.removed.items() if v > limit}
-            files = ((NODES_FILE, json.dumps(self.nodes, ensure_ascii=False, separators=(",", ":"))),
-                     (REMOVED_FILE, json.dumps(self.removed)))
+            if final and self.hist:
+                self.hist_dirty = True
+            if self.dirty:
+                self.dirty = False
+                # 已删除名单保留 90 天
+                limit = time.time() - 90 * 86400
+                self.removed = {k: v for k, v in self.removed.items() if v > limit}
+                files += [(NODES_FILE, json.dumps(self.nodes, ensure_ascii=False, separators=(",", ":"))),
+                          (REMOVED_FILE, json.dumps(self.removed))]
+            if self.hist_dirty:
+                self.hist_dirty = False
+                files.append((HISTORY_FILE, json.dumps(self.hist, separators=(",", ":"))))
         for path, data in files:
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
@@ -209,6 +227,62 @@ class Store:
             elif msg[0] == "d":
                 n["d"] = msg[1:]
                 n["t"] = time.time()
+                self.record(nid, n["d"], n["t"])
+
+    @staticmethod
+    def close_slot(cur):
+        """把一格的累计值换算为 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1"""
+        row = [cur[0]]
+        for a in cur[1:]:
+            row += [round(a[0] / a[1], 1) if a[1] else -1, round(a[2] / a[3]) if a[3] else -1]
+        return row
+
+    def record(self, nid, d, now):
+        """
+        记录三网历史（调用方需持有锁）。客户端每次上报带有最近一个探测窗口的 [延迟, 丢包率]，
+        按 20 分钟一格取平均，节点无需改动
+        """
+        if len(d) < 24:
+            return
+        slot = int(now // PING_STEP) * PING_STEP
+        h = self.hist.setdefault(nid, {"cur": None, "list": []})
+        cur = h["cur"]
+        if cur and cur[0] != slot:
+            h["list"] = [x for x in h["list"] if x[0] > now - 86400] + [self.close_slot(cur)]
+            self.hist_dirty = True
+            cur = None
+        if cur is None:
+            cur = h["cur"] = [slot, [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        for k in range(3):   # 联通 / 电信 / 移动
+            ms, loss = d[18 + 2 * k], d[19 + 2 * k]
+            if ms < 0 and not loss:   # 客户端刚启动，尚无探测结果
+                continue
+            a = cur[1 + k]   # [丢包率累计, 次数, 延迟累计, 次数]
+            a[0] += loss
+            a[1] += 1
+            if ms >= 0:
+                a[2] += ms
+                a[3] += 1
+
+    def history(self):
+        """三网 24 小时历史（json, gzip），按节点短 ID 索引，30 秒内复用缓存"""
+        now = time.time()
+        if now - self.hist_cache[0] < 30:
+            return self.hist_cache[1], self.hist_cache[2]
+        start = int(now // PING_STEP) * PING_STEP - (PING_SLOTS - 1) * PING_STEP
+        out = {}
+        with self.lock:
+            for nid, h in self.hist.items():
+                rows = [x for x in h["list"] if x[0] >= start]
+                if h["cur"] and h["cur"][0] >= start:
+                    rows.append(self.close_slot(h["cur"]))
+                if rows:
+                    out[nid[:8]] = rows
+        body = json.dumps({"start": start, "step": PING_STEP, "slots": PING_SLOTS, "nodes": out},
+                          separators=(",", ":")).encode("utf-8")
+        gz = gzip.compress(body, 6)
+        self.hist_cache = (now, body, gz)
+        return body, gz
 
     def delete(self, key, uninstall=False):
         """删除节点；uninstall=True 时记入已删除名单，客户端重连时会自行卸载"""
@@ -217,6 +291,8 @@ class Store:
                    if nid == key or (n["s"] and self.name_of(n) == key)]
             for nid in ids:
                 del self.nodes[nid]
+                if self.hist.pop(nid, None):
+                    self.hist_dirty = True
                 if uninstall:
                     self.removed[nid] = time.time()
                 c = self.conns.pop(nid, None)
@@ -242,11 +318,6 @@ class Store:
             self.nodes[nid]["a"] = name
             self.dirty = True
 
-    def set_ping24h(self, nid, pid):
-        with self.lock:
-            self.nodes[nid]["pg"] = pid
-            self.dirty = True
-
     def set_order(self, nid, order):
         with self.lock:
             self.nodes[nid]["o"] = order
@@ -260,7 +331,7 @@ class Store:
                      "ip": n.get("ip", ""), "cc": n["s"][2] if n["s"] else "", "order": n["o"],
                      "last": int(n["t"]), "os": n["s"][8] if n["s"] else "",
                      "latest": bool(n.get("sv")) and n.get("sv") == AGENTS[n.get("os", "linux")][1],
-                     "platform": n.get("os", "linux"), "ping24h": n.get("pg", "")}
+                     "platform": n.get("os", "linux")}
                     for nid, n in items]
 
     def cleanup(self):
@@ -271,7 +342,8 @@ class Store:
         with self.lock:
             for nid in [k for k, n in self.nodes.items() if n["t"] and n["t"] < limit]:
                 del self.nodes[nid]
-                self.dirty = True
+                self.hist.pop(nid, None)
+                self.dirty = self.hist_dirty = True
 
     def stats(self):
         """返回 (json, gzip) 两种格式，1 秒内复用缓存"""
@@ -303,7 +375,7 @@ class Store:
         servers = []
         with self.lock:
             items = self.sorted_items()
-            for _, n in items:
+            for nid, n in items:
                 s, d = n["s"], n["d"]
                 if not s:
                     continue
@@ -320,6 +392,7 @@ class Store:
                         boot = n["bt"]
                     n["bt"] = boot
                 servers.append({
+                    "id": nid[:8],               # 用于对应 json/ping24h.json 中的三网历史
                     "name": self.name_of(n), "type": s[1], "host": s[0], "location": s[2],
                     "online4": online and ("4" in proto or not proto),
                     "online6": online and "6" in proto,
@@ -329,7 +402,6 @@ class Store:
                     "load_1": d[1], "load_5": d[1], "load_15": d[1],
                     "ping_10010": d[19], "ping_189": d[21], "ping_10086": d[23],
                     "time_10010": max(d[18], 0), "time_189": max(d[20], 0), "time_10086": max(d[22], 0),
-                    "ping24h": n.get("pg", ""),  # vps789 三网 24 小时 ping 图 id，未设置为空
                     "tcp_count": d[13], "udp_count": d[14], "process_count": d[15], "thread_count": d[16],
                     "network_rx": d[2], "network_tx": d[3],
                     "network_in": d[4], "network_out": d[5],
@@ -476,6 +548,9 @@ class WebHandler(BaseHTTPRequestHandler):
         if url.path == "/json/stats.json":
             body, gz = STORE.ss_stats()
             return self.send(200, body, gz=gz)
+        if url.path == "/json/ping24h.json":
+            body, gz = STORE.history()
+            return self.send(200, body, gz=gz)
         path = "/index.html" if url.path == "/" else url.path
         full = os.path.realpath(os.path.join(WEB_DIR, path.lstrip("/")))
         if not full.startswith(os.path.realpath(WEB_DIR) + os.sep) or not os.path.isfile(full):
@@ -550,7 +625,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
-        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|ping24h|update&id=..&name=..&order=..&url=..
+        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update&id=..&name=..&order=..
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
@@ -579,13 +654,6 @@ class WebHandler(BaseHTTPRequestHandler):
             STORE.delete(nid, uninstall=q.get("uninstall", "1") == "1")
         elif action == "rename" and q.get("name", "").strip():
             STORE.rename(nid, q["name"].strip()[:64])
-        elif action == "ping24h":
-            # 接受 vps789 返回的网页地址、图片地址或纯 id，留空为清除
-            v = q.get("url", "").strip()
-            m = re.search(r"(?:[?&]id=|/view/)([\w-]+)", v) or re.fullmatch(r"([\w-]*)", v)
-            if not m:
-                return {"ok": 0, "msg": "无法识别的 vps789 地址"}
-            STORE.set_ping24h(nid, m.group(1)[:64])
         elif action == "order" and q.get("order", "").lstrip("-").isdigit():
             STORE.set_order(nid, int(q["order"]))
         else:
@@ -649,7 +717,7 @@ def check_update():
     with open(VERSION_FILE, "w") as f:
         f.write(sha)
     log("更新完成，重启主控")
-    STORE.save()
+    STORE.save(final=True)
     os.execv(sys.executable, [sys.executable, "-u", os.path.join(BASE_DIR, "server.py")])
 
 
@@ -678,6 +746,8 @@ def main():
     log("网页端口: %s  上报端口: %s" % (CFG["http_port"], CFG["agent_port"]))
     log("Token: %s" % CFG["token"])
     log("版本: %s" % VERSION[:7])
+    # systemctl stop / restart 发送 SIGTERM，退出前保存数据
+    signal.signal(signal.SIGTERM, lambda *_: (STORE.save(final=True), sys.exit(0)))
     if CFG.get("auto_update") and VERSION != "dev":
         threading.Thread(target=update_loop, daemon=True).start()
     try:
@@ -686,7 +756,7 @@ def main():
             STORE.cleanup()
             STORE.save()
     except KeyboardInterrupt:
-        STORE.save()
+        STORE.save(final=True)
         sys.exit(0)
 
 

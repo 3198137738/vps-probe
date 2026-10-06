@@ -60,12 +60,79 @@ function formatTime(ts) {
 		p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds());
 }
 
-// vps789 三网 24 小时 ping 图地址；图片每 20 分钟更新，按 20 分钟加时间参数避免浏览器用旧缓存
-function ping24hImg(id) {
-	return "https://vps789.com/public/view/" + encodeURIComponent(id) + "?t=" + Math.floor(Date.now() / 1200000);
+// ---------------------------------------------------------------- 三网 24 小时丢包图
+// 历史数据每分钟拉取一次；每行格式 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1
+var p24 = { at: 0, data: null };
+var P24_LINES = ["联通", "电信", "移动"];
+
+function loadPing24h() {
+	if (Date.now() - p24.at < 60000)
+		return;
+	p24.at = Date.now();
+	$.getJSON("json/ping24h.json", function(r) { p24.data = r; });
 }
 
-// 只在内容变化时才替换，避免每 3 秒重建图片导致闪烁和重复下载
+// 丢包率颜色：c0 0%，c1 0~10%，c2 10~30%，c3 >30%，cx 失联
+function lossClass(loss) {
+	return loss >= 100 ? "cx" : loss > 30 ? "c3" : loss > 10 ? "c2" : loss > 0 ? "c1" : "c0";
+}
+
+function fmtLoss(loss) {
+	return (loss > 0 && loss < 10 ? loss.toFixed(1) : Math.round(loss)) + "%";
+}
+
+function fmtHM(ts) {
+	var t = new Date(ts * 1000);
+	return ("0" + t.getHours()).slice(-2) + ":" + ("0" + t.getMinutes()).slice(-2);
+}
+
+// 每条线路 24 小时平均 [丢包%, 延迟ms]，无数据为 -1
+function p24Summary(rows) {
+	var out = [];
+	for (var k = 0; k < 3; k++) {
+		var ls = 0, ln = 0, ms = 0, mn = 0;
+		for (var j = 0; j < rows.length; j++) {
+			if (rows[j][1 + 2 * k] >= 0) { ls += rows[j][1 + 2 * k]; ln++; }
+			if (rows[j][2 + 2 * k] >= 0) { ms += rows[j][2 + 2 * k]; mn++; }
+		}
+		out.push([ln ? ls / ln : -1, mn ? Math.round(ms / mn) : -1]);
+	}
+	return out;
+}
+
+// 丢包图：每条线路一排柱子，颜色表示丢包率，高度表示延迟（350ms 及以上为满高）
+function p24Chart(rows, sum) {
+	var d = p24.data, slots = [];
+	for (var j = 0; j < rows.length; j++)
+		slots[(rows[j][0] - d.start) / d.step] = rows[j];
+	var end = d.start + d.slots * d.step;
+	var html = "<div class=\"p24\"><div class=\"p24-head\">三网 24 小时丢包<span>" +
+		formatTime(d.start).slice(5, 16) + " - " + formatTime(Math.min(end, Date.now() / 1000)).slice(5, 16) + "　每 20 分钟一格</span></div>";
+	for (var k = 0; k < 3; k++) {
+		html += "<div class=\"p24-row\"><span class=\"p24-name\">" + P24_LINES[k] + "</span><div class=\"p24-bars\">";
+		for (var i = 0; i < d.slots; i++) {
+			var r = slots[i], loss = r ? r[1 + 2 * k] : -1, ms = r ? r[2 + 2 * k] : -1;
+			if (loss < 0) {
+				html += "<i class=\"ce\" style=\"height:4px\"></i>";
+				continue;
+			}
+			var h = loss >= 100 || ms < 0 ? 24 : 6 + Math.round(18 * Math.min(ms, 350) / 350);
+			html += "<i class=\"" + lossClass(loss) + "\" style=\"height:" + h + "px\" title=\"" +
+				formatTime(r[0]).slice(5, 16) + "  延迟 " + (ms >= 0 ? ms + "ms" : "-") + "  丢包 " + fmtLoss(loss) + "\"></i>";
+		}
+		html += "</div><span class=\"p24-sum\">" + (sum[k][1] >= 0 ? sum[k][1] + "ms" : "-") + " / " +
+			(sum[k][0] >= 0 ? fmtLoss(sum[k][0]) : "-") + "</span></div>";
+	}
+	html += "<div class=\"p24-axis\">";
+	for (var a = 0; a <= 4; a++)
+		html += "<span>" + fmtHM(d.start + a * 18 * d.step) + "</span>";
+	html += "</div><div class=\"p24-legend\">丢包率:<b class=\"c0\"></b>0%<b class=\"c1\"></b>0~10%" +
+		"<b class=\"c2\"></b>10~30%<b class=\"c3\"></b>&gt;30%<b class=\"cx\"></b>失联" +
+		"<span style=\"float:right\">平均延迟 / 丢包率</span></div></div>";
+	return html;
+}
+
+// 只在内容变化时才替换，避免每 3 秒重建导致闪烁、悬停弹窗消失
 function setHtml(el, html) {
 	if (el._html !== html) {
 		el._html = html;
@@ -86,6 +153,7 @@ function uptime() {
 	// 页面不可见时不刷新，节省流量
 	if (document.hidden)
 		return;
+	loadPing24h();
 	$.getJSON("json/stats.json", function(result) {
 		$("#loading-notice").remove();
 		// 主控更新后版本号变化，自动刷新页面加载新前端
@@ -316,21 +384,30 @@ function uptime() {
                 var PING_189 = result.servers[i].ping_189.toFixed(0);
                 var PING_10086 = result.servers[i].ping_10086.toFixed(0);
                 var ms = function(t) { return t > 0 ? t + "ms" : "-"; };
-				ExpandRow[0].children["expand_ping"].innerHTML = "联通/电信/移动: " +
+				ExpandRow[0].children["expand_ping"].innerHTML = "实时 联通/电信/移动: " +
 					ms(result.servers[i].time_10010) + " (" + PING_10010 + "%) / " +
 					ms(result.servers[i].time_189) + " (" + PING_189 + "%) / " +
 					ms(result.servers[i].time_10086) + " (" + PING_10086 + "%)";
-                // 三网丢包：显示 vps789 24 小时 ping 图标签，悬停弹出完整图片；未设置时显示灰色标签
-                var p24 = result.servers[i].ping24h;
+                // 三网丢包：表格显示三条线路 24 小时平均丢包率，悬停弹出丢包图，展开详情中也显示
+                var rows = p24.data && p24.data.nodes[result.servers[i].id], cell = "", chart = "";
+                var sum = rows ? p24Summary(rows) : [];
+                if (sum.some(function(x) { return x[0] >= 0; })) {
+                    var pillCls = { c0: "", c1: "mid", c2: "bad", c3: "dead", cx: "none" };
+                    for (var k = 0; k < 3; k++) {
+                        var loss = sum[k][0];
+                        cell += loss < 0 ? "<span class=\"pv none\">" + P24_LINES[k].charAt(0) + " -</span>" :
+                            "<span class=\"pv " + pillCls[lossClass(loss)] + "\">" + P24_LINES[k].charAt(0) + " " + fmtLoss(loss) + "</span>";
+                    }
+                    chart = p24Chart(rows, sum);
+                    cell += "<div class=\"p24-pop\">" + chart + "</div>";
+                } else {
+                    cell = "<span class=\"pv none\" title=\"节点上线后自动记录三网丢包，约 20 分钟后显示\">收集中</span>";
+                }
                 TableRow.children["ping"].children[0].className = "progress ping-wrap";
                 TableRow.children["ping"].children[0].children[0].className = "progress-bar ping-bar";
                 TableRow.children["ping"].children[0].children[0].style.width = "100%";
-                setHtml(TableRow.children["ping"].children[0].children[0], p24 ?
-                    "<span class=\"pv p24\">24h丢包<img src=\"" + ping24hImg(p24) + "\" loading=\"lazy\" alt=\"\"></span>" :
-                    "<span class=\"pv none\" title=\"在主控运行 probe → 编辑节点 → 设置三网丢包图\">未设置</span>");
-                setHtml(ExpandRow[0].children["expand_ping24h"], p24 ?
-                    "<a href=\"https://vps789.com/ping24h/?id=" + encodeURIComponent(p24) + "\" target=\"_blank\">" +
-                    "<img class=\"p24-full\" src=\"" + ping24hImg(p24) + "\" loading=\"lazy\" alt=\"三网 24 小时 ping\"></a>" : "");
+                setHtml(TableRow.children["ping"].children[0].children[0], cell);
+                setHtml(ExpandRow[0].children["expand_ping24h"], chart);
 
 				// Custom
 				if (result.servers[i].custom) {
