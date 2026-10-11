@@ -86,7 +86,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 
 ### 清理哪吒探针
 
-一键删除哪吒探针（Agent / Dashboard，v0 与 v1）的服务、进程、`/opt/nezha` 等目录、Docker 容器、crontab 任务，`/tmp` 下的下载残留，以及 `/root` 下的 `nezha.sh`、`nezha_v0.sh` 等安装脚本，清理后自动全盘检查残留（加 `-y` 跳过确认，`-c` 只检查不删除）：
+一键删除哪吒探针（Agent / Dashboard，v0 与 v1）的服务、进程、`/opt/nezha` 等目录、Docker 容器、crontab 任务，`/tmp` 下的下载残留，以及 `/root` 下的 `nezha.sh`、`nezha_v0.sh` 等安装脚本，清理后自动全盘检查残留。运行后显示菜单（1 清理 / 2 只检查残留 / 0 退出），也可加 `-y` 直接清理、`-c` 直接检查：
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall-nezha.sh)
