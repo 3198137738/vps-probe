@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 哪吒探针（Nezha）一键清理：删除 Agent / Dashboard（v0、v1）的服务、进程、文件、容器、定时任务及安装脚本
-# 用法：bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall-nezha.sh) [-y]
+# 用法：bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall-nezha.sh) [-y|-c]
 #   -y  跳过确认
+#   -c  只检查残留，不删除
 
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -22,6 +23,22 @@ list_services() {
     ls /etc/systemd/system /lib/systemd/system /usr/lib/systemd/system /etc/init.d 2>/dev/null
   } | sed 's/\.service$//' | grep -i '^nezha' | sort -u
 }
+
+# 全面检查进程、服务、文件、容器、定时任务、端口，有残留返回 1
+check() {
+  local found=0
+  show() { [ -n "$2" ] && { red "[$1]"; echo "$2"; found=1; }; }
+  show "进程" "$(ps -ef | grep -i nezha | grep -v -e grep -e uninstall-nezha)"
+  show "服务" "$(list_services)"
+  show "定时任务" "$(crontab -l 2>/dev/null | grep -i nezha)"
+  command -v docker >/dev/null 2>&1 && show "Docker 容器" "$(docker ps -a 2>/dev/null | grep -i nezha)"
+  command -v ss >/dev/null 2>&1 && show "监听端口" "$(ss -tlnp 2>/dev/null | grep -i nezha)"
+  show "文件" "$(find / \( -path /proc -o -path /sys -o -path /dev -o -path /run/user \) -prune -o -iname '*nezha*' -print 2>/dev/null | grep -v uninstall-nezha)"
+  [ "$found" = 0 ] && green "检查完成：未发现任何哪吒探针残留"
+  return "$found"
+}
+
+if [ "$1" = "-c" ]; then check; exit $?; fi
 
 SERVICES="$(list_services | tr '\n' ' ')"
 
@@ -80,6 +97,10 @@ fi
 for d in $DIRS; do
   [ -e "$d" ] && rm -rf "$d" && echo "已删除 $d"
 done
+# 安装过程留在临时目录的下载文件（如 /tmp/nezha-agent、nezha-agent_linux_amd64.zip）
+for f in /tmp/*nezha* /var/tmp/*nezha*; do
+  [ -e "$f" ] && rm -rf "$f" && echo "已删除 $f"
+done
 
 # 安装脚本：只删除内容中含 nezha 的文件，避免误删同名的其它脚本
 for dir in /root "$PWD"; do
@@ -89,11 +110,10 @@ for dir in /root "$PWD"; do
   done
 done
 
-# 检查是否还有残留
-left="$(pgrep -af nezha 2>/dev/null | grep -v -e uninstall-nezha -e pgrep)"
-if [ -n "$left" ]; then
-  red "仍有以下进程未结束，请手动确认："
-  echo "$left"
-else
+echo
+echo "正在检查残留..."
+if check; then
   green "清理完成，本机已无哪吒探针的服务与文件"
+else
+  red "以上为未能自动清理的残留，请手动确认后删除"
 fi
