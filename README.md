@@ -84,6 +84,14 @@ Linux 也可直接从 GitHub 安装：`bash <(curl -fsSL https://raw.githubuserc
 bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall.sh)
 ```
 
+### 清理哪吒探针
+
+一键删除哪吒探针（Agent / Dashboard，v0 与 v1）的服务、进程、`/opt/nezha` 等目录、Docker 容器、crontab 任务，以及 `/root` 下的 `nezha.sh`、`nezha_v0.sh` 等安装脚本（加 `-y` 跳过确认）：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/uninstall-nezha.sh)
+```
+
 ## 配置（`/opt/probe-server/config.json`）
 
 | 字段 | 默认 | 说明 |
@@ -134,4 +142,5 @@ install.sh            Linux 客户端安装 / 卸载
 install.ps1           Windows 客户端安装 / 卸载
 install_server.sh     兼容旧命令，等同于 probe.sh install
 uninstall.sh          一键彻底卸载（客户端 + 服务端）
+uninstall-nezha.sh    一键清理哪吒探针
 ```
