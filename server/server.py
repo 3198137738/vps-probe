@@ -126,6 +126,7 @@ class Store:
         self.nodes = {}
         self.conns = {}     # id -> 当前连接对象
         self.removed = {}   # 已在主控删除的节点 id -> 删除时间，重连时通知客户端自行卸载
+        self.force_up = set()   # 待强制更新客户端的节点 id（主控手动触发，不受 agent_auto_update 限制）
         # 三网历史 id -> {"cur": 当前格累计, "list": [[格起始时间, 联通丢包, 联通延迟, 电信.., .., 移动.., ..], ...]}
         self.hist = {}
         self.dirty = False
@@ -305,6 +306,20 @@ class Store:
                 self.dirty = True
             return len(ids)
 
+    def upgrade(self, key=None):
+        """让在线且客户端过期的节点立即更新：断开其连接，重连时下发新版客户端，返回已通知的节点 id"""
+        with self.lock:
+            ids = [nid for nid, n in self.nodes.items()
+                   if (key is None or nid == key) and nid in self.conns
+                   and n.get("sv") and n["sv"] != AGENTS[n.get("os", "linux")][1]]
+            for nid in ids:
+                self.force_up.add(nid)
+                try:
+                    self.conns[nid].shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass
+            return ids
+
     def find(self, key):
         """按完整 ID、ID 前缀或名称查找节点"""
         with self.lock:
@@ -457,8 +472,12 @@ class AgentHandler(socketserver.StreamRequestHandler):
         if nid == "install-check":
             # 告知安装脚本原节点 ID 是否已被删除，以便重新生成 ID
             resp["removed"] = str(auth.get("rid", "")) in STORE.removed
-        if CFG.get("agent_auto_update") and agent_sha:
+        force = nid in STORE.force_up
+        STORE.force_up.discard(nid)
+        if agent_sha and (force or CFG.get("agent_auto_update")):
             resp["av"] = agent_sha
+            if force:
+                resp["fu"] = 1   # 强制更新：即使该版本上次更新失败也重试
         self.wfile.write((json.dumps(resp) + "\n").encode())
         if nid == "install-check":   # 安装脚本的连通性检查，不登记节点
             return
@@ -625,7 +644,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
-        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update&id=..&name=..&order=..
+        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update|upgrade&id=..&name=..&order=..
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
@@ -647,6 +666,8 @@ class WebHandler(BaseHTTPRequestHandler):
                 return {"ok": 0, "msg": "源码运行模式不支持自动更新"}
             threading.Thread(target=run_update, daemon=True).start()
             return {"ok": 1}
+        if action == "upgrade" and q.get("id", "all") == "all":
+            return {"ok": 1, "ids": STORE.upgrade()}
         nid = STORE.find(q.get("id", ""))
         if not nid:
             return {"ok": 0, "msg": "节点不存在"}
@@ -656,6 +677,11 @@ class WebHandler(BaseHTTPRequestHandler):
             STORE.rename(nid, q["name"].strip()[:64])
         elif action == "order" and q.get("order", "").lstrip("-").isdigit():
             STORE.set_order(nid, int(q["order"]))
+        elif action == "upgrade":
+            ids = STORE.upgrade(nid)
+            if not ids:
+                return {"ok": 0, "msg": "节点离线、已是最新版，或客户端过旧不支持自动更新"}
+            return {"ok": 1, "ids": ids}
         else:
             return {"ok": 0, "msg": "参数错误"}
         STORE.save()

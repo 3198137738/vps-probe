@@ -403,7 +403,7 @@ function Invoke-Session {
             Start-Sleep -Seconds 60
             return
         }
-        if ($resp.av -and $resp.av -ne $SelfSha -and $resp.av -ne $script:FailedUpdate) {
+        if ($resp.av -and $resp.av -ne $SelfSha -and ($resp.av -ne $script:FailedUpdate -or $resp.fu)) {
             $client.Close()
             Update-Self $resp.av
             return

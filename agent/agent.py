@@ -545,7 +545,7 @@ class Agent:
                 time.sleep(60)
                 return
             av = resp.get("av")
-            if av and av != SELF_SHA and av != self.failed_update:
+            if av and av != SELF_SHA and (av != self.failed_update or resp.get("fu")):
                 sock.close()
                 self.self_update(host, port, av)
                 return

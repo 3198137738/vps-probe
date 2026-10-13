@@ -206,8 +206,29 @@ if cmd in ("table", "ids", "summary", "old"):
             color = "1" if j == 0 else ("32" if nodes[j - 1]["online"] else "31")
             print("\033[%sm%s\033[0m" % (color, line))
         if any(n["online"] and not n.get("latest") for n in nodes):
-            print("\n\033[33m提示：在线但显示「旧版」的节点通常会在重连时自动更新；若长时间仍为旧版，"
-                  "说明其客户端过旧不支持自动更新，请使用主菜单「7. 批量更新旧版客户端」（节点 ID 不变）\033[0m")
+            print("\n\033[33m提示：在线但显示「旧版」的节点可在主菜单「7. 更新节点」中立即更新；"
+                  "若更新后仍为旧版，说明其客户端过旧不支持自动更新，请选择其中的「SSH 重装旧版客户端」（节点 ID 不变）\033[0m")
+elif cmd == "upgrade":
+    # 通知节点立即更新客户端（ID 或 all），输出已通知的节点 ID
+    r = call("upgrade", id=args[0] if args else "all")
+    if not r.get("ok"):
+        print(r.get("msg", "失败"))
+        sys.exit(1)
+    for i in r["ids"]:
+        print(i)
+elif cmd == "wait":
+    # 等待节点更新完成并重新上线：wait 秒数 ID...
+    pending, deadline, names = set(args[1:]), time.time() + int(args[0]), {}
+    while pending and time.time() < deadline:
+        time.sleep(2)
+        for n in call("list").get("nodes", []):
+            names[n["id"]] = n["name"] or n["id"][:8]
+            if n["id"] in pending and n["online"] and n.get("latest"):
+                pending.discard(n["id"])
+                print("\033[32m  ✓ %s 已更新并生效\033[0m" % names[n["id"]])
+    for i in pending:
+        print("\033[31m  ✗ %s 未在 %s 秒内完成更新\033[0m" % (names.get(i, i[:8]), args[0]))
+    sys.exit(1 if pending else 0)
 else:
     kw = dict(a.split("=", 1) for a in args)
     r = call(cmd, **kw)
@@ -528,6 +549,54 @@ update_old_agents() {
   echo "稍等片刻后在「查看节点」中确认客户端列显示为「最新」"
 }
 
+# 更新节点客户端：主控断开节点连接并下发新版客户端，节点下载后原地重启，无需 SSH
+# 参数为节点 ID，省略则更新全部过期节点
+upgrade_nodes() {
+  local out ids n
+  out="$(pyapi upgrade "${1:-all}")" || { red "$out"; return 1; }
+  mapfile -t ids < <(printf '%s\n' "$out" | grep .)
+  if [ "${#ids[@]}" -eq 0 ]; then
+    green "所有在线节点的客户端都已是最新版"
+  else
+    blue "已通知 ${#ids[@]} 个节点更新，等待其下载新版客户端并重启 ..."
+    n=$(( $(cfg_get interval) * 3 + 60 ))
+    pyapi wait "$n" "${ids[@]}" && green "节点更新完成，已自动生效"
+  fi
+  # 早期安装的客户端不支持自动更新，只能 SSH 重装
+  out="$(pyapi old)"
+  if [ -n "$out" ]; then
+    echo
+    yellow "以下节点仍为旧版客户端（可能不支持自动更新）："
+    printf '%s\n' "$out" | while IFS=$'\t' read -r _ name ip; do echo "  - $name（$ip）"; done
+    yellow "可在「7. 更新节点 → 3. SSH 重装旧版客户端」中处理"
+  fi
+}
+
+menu_upgrade() {
+  need_installed || return 1
+  local cur new
+  cur="$(cat "$DIR/.version" 2>/dev/null)"; new="$(latest_sha)"
+  if [ -n "$new" ] && [ "$new" != "$cur" ]; then
+    yellow "GitHub 上有新版本 ${new:0:7}（主控当前 ${cur:0:7}），节点客户端随主控分发"
+    if confirm "是否先更新主控，再更新节点？"; then
+      do_update || return 1
+      blue "等待节点重新连接主控 ..."
+      wait_server || { red "主控未能正常启动"; return 1; }
+      sleep $(( $(cfg_get interval) * 2 + 5 ))
+    fi
+  fi
+  echo
+  echo " 1. 更新全部节点（只更新客户端不是最新版的在线节点）"
+  echo " 2. 选择单个节点更新"
+  echo " 3. SSH 重装旧版客户端（早期安装、不支持自动更新的节点）"
+  echo " 0. 返回"
+  case "$(ask "请选择: ")" in
+    1) upgrade_nodes ;;
+    2) pick_node && upgrade_nodes "$PICK_ID" ;;
+    3) update_old_agents ;;
+  esac
+}
+
 menu_add() {
   need_installed || return 1
   echo
@@ -733,7 +802,7 @@ main_menu() {
     echo "  4. 添加节点"
     echo "  5. 删除节点"
     echo "  6. 编辑节点（改名 / 排序）"
-    echo "  7. 批量更新旧版客户端"
+    echo "  7. 更新节点"
     echo " ------------------ 管理 ------------------"
     echo "  8. 查看 Token 与添加命令"
     echo "  9. 修改设置"
@@ -748,7 +817,7 @@ main_menu() {
       4) menu_add ;;
       5) menu_delete ;;
       6) menu_edit ;;
-      7) update_old_agents ;;
+      7) menu_upgrade ;;
       8) show_info ;;
       9) menu_settings ;;
       10) menu_service ;;
@@ -771,7 +840,7 @@ usage() {
   add          添加节点
   del          删除节点
   edit         编辑节点
-  upgrade      批量更新旧版客户端
+  upgrade      更新节点客户端（立即生效）
   info         查看 Token 与添加命令
   set          修改设置
   restart      重启主控
@@ -789,7 +858,7 @@ case "$1" in
   add) menu_add ;;
   del|delete) menu_delete ;;
   edit) menu_edit ;;
-  upgrade) update_old_agents ;;
+  upgrade) menu_upgrade ;;
   info) show_info ;;
   set|settings) menu_settings ;;
   restart) need_installed && restart_server ;;
