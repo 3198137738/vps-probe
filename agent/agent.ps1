@@ -387,6 +387,24 @@ Unregister-ScheduledTask -TaskName ProbeAgentRemove -Confirm:`$false -ErrorActio
     while ($true) { Start-Sleep -Seconds 60 }   # 等待被清理任务结束
 }
 
+# 执行主控下发的指令：n 新名称写入本地配置，rf 立即重新检测静态信息
+function Invoke-Reply($resp) {
+    if ($resp.n -and [string]$resp.n -ne [string]$script:Cfg.name) {
+        $script:Cfg | Add-Member -NotePropertyName name -NotePropertyValue ([string]$resp.n) -Force
+        try {
+            [IO.File]::WriteAllText("$ConfigFile.tmp", (ConvertTo-Json -InputObject $script:Cfg), $Utf8)
+            Move-Item -LiteralPath "$ConfigFile.tmp" -Destination $ConfigFile -Force
+            Log "名称已更新: $($resp.n)"
+        } catch { Log "保存配置失败: $($_.Exception.Message)" }
+    }
+    if ($resp.rf) {
+        $script:Geo.ts = [datetime]::MinValue
+        $script:Virt = Get-Virt
+        $script:OsInfo = Get-OsInfo
+        Log '重新检测节点信息'
+    }
+}
+
 function Invoke-Session {
     Log ('连接主控 {0}:{1}' -f $script:Cfg.server, $script:Cfg.port)
     $client = Open-Master
@@ -408,9 +426,11 @@ function Invoke-Session {
             Update-Self $resp.av
             return
         }
+        Invoke-Reply $resp
         $interval = [Math]::Max(1, [int]$resp.i)
         Set-PingConfig $resp.p $resp.pi $resp.pw
         Log "已连接，上报间隔 ${interval}s"
+        $script:Connected = $true
         $script:LastStatic = ''
         while ($true) {
             $t0 = Get-Date
@@ -461,9 +481,10 @@ Initialize-Traffic
 
 $delay = 3
 while ($true) {
-    $start = Get-Date
+    $start = Get-Date; $script:Connected = $false
     try { Invoke-Session } catch { Log "连接中断: $($_.Exception.Message)" }
     Save-State
-    if (((Get-Date) - $start).TotalSeconds -gt 60) { $delay = 3 } else { $delay = [Math]::Min($delay * 2, 60) }
+    # 连接成功过（如被主控断开以下发指令）3 秒后重连，连接失败才逐步延长重试间隔
+    if ($script:Connected -or ((Get-Date) - $start).TotalSeconds -gt 60) { $delay = 3 } else { $delay = [Math]::Min($delay * 2, 60) }
     Start-Sleep -Seconds $delay
 }

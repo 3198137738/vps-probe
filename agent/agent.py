@@ -529,6 +529,22 @@ class Agent:
         self.traffic.save()
         os.execv(sys.executable, [sys.executable, "-u", os.path.abspath(__file__)])
 
+    def apply(self, resp):
+        """执行主控下发的指令：n 新名称写入本地配置，rf 立即重新检测静态信息"""
+        name = resp.get("n")
+        if isinstance(name, str) and name and name != self.cfg.get("name"):
+            self.cfg["name"] = name
+            try:
+                with open(CONFIG_FILE + ".tmp", "w", encoding="utf-8") as f:
+                    json.dump(self.cfg, f, ensure_ascii=False, indent=2)
+                os.replace(CONFIG_FILE + ".tmp", CONFIG_FILE)
+                log("名称已更新:", name)
+            except Exception as e:
+                log("保存配置失败:", e)
+        if resp.get("rf"):
+            self.geo["ts"] = 0
+            log("重新检测节点信息")
+
     def run_once(self):
         host, port = self.cfg["server"], int(self.cfg.get("port", 35688))
         log("连接服务端 %s:%s" % (host, port))
@@ -549,9 +565,11 @@ class Agent:
                 sock.close()
                 self.self_update(host, port, av)
                 return
+            self.apply(resp)
             interval = max(1, int(resp.get("i", 3)))
             self.pinger.configure(resp.get("p"), resp.get("pi"), resp.get("pw"))
             log("已连接，上报间隔 %ss" % interval)
+            self.connected = True
             self.static = None
             while True:
                 t0 = time.time()
@@ -574,13 +592,14 @@ class Agent:
     def run(self):
         delay = 3
         while True:
-            start = time.time()
+            start, self.connected = time.time(), False
             try:
                 self.run_once()
             except Exception as e:
                 log("连接中断:", e)
             self.traffic.save()
-            delay = 3 if time.time() - start > 60 else min(delay * 2, 60)
+            # 连接成功过（如被主控断开以下发指令）3 秒后重连，连接失败才逐步延长重试间隔
+            delay = 3 if self.connected or time.time() - start > 60 else min(delay * 2, 60)
             time.sleep(delay)
 
 

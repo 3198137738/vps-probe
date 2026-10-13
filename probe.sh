@@ -123,7 +123,7 @@ json.dump(c, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 PY
 }
 
-# 主控管理接口：pyapi table|ids|summary|<action> [k=v ...]
+# 主控管理接口：pyapi table|ids|summary|old|upgrade [ID]|refresh [ID]|wait 秒数 ID...|<action> [k=v ...]
 pyapi() {
   python3 - "$CONF" "$@" <<'PY'
 import json, os, sys, time, unicodedata, urllib.parse, urllib.request
@@ -208,9 +208,9 @@ if cmd in ("table", "ids", "summary", "old"):
         if any(n["online"] and not n.get("latest") for n in nodes):
             print("\n\033[33m提示：在线但显示「旧版」的节点可在主菜单「7. 更新节点」中立即更新；"
                   "若更新后仍为旧版，说明其客户端过旧不支持自动更新，请选择其中的「SSH 重装旧版客户端」（节点 ID 不变）\033[0m")
-elif cmd == "upgrade":
-    # 通知节点立即更新客户端（ID 或 all），输出已通知的节点 ID
-    r = call("upgrade", id=args[0] if args else "all")
+elif cmd in ("upgrade", "refresh"):
+    # 通知节点立即更新客户端 / 重新检测信息（ID 或 all），输出已通知的节点 ID
+    r = call(cmd, id=args[0] if args else "all")
     if not r.get("ok"):
         print(r.get("msg", "失败"))
         sys.exit(1)
@@ -572,28 +572,60 @@ upgrade_nodes() {
   fi
 }
 
-menu_upgrade() {
-  need_installed || return 1
+# GitHub 有新版本时提示先更新主控（节点客户端随主控分发）
+offer_server_update() {
   local cur new
   cur="$(cat "$DIR/.version" 2>/dev/null)"; new="$(latest_sha)"
-  if [ -n "$new" ] && [ "$new" != "$cur" ]; then
-    yellow "GitHub 上有新版本 ${new:0:7}（主控当前 ${cur:0:7}），节点客户端随主控分发"
-    if confirm "是否先更新主控，再更新节点？"; then
-      do_update || return 1
-      blue "等待节点重新连接主控 ..."
-      wait_server || { red "主控未能正常启动"; return 1; }
-      sleep $(( $(cfg_get interval) * 2 + 5 ))
-    fi
+  [ -n "$new" ] && [ "$new" != "$cur" ] || return 0
+  yellow "GitHub 上有新版本 ${new:0:7}（主控当前 ${cur:0:7}），节点客户端随主控分发"
+  confirm "是否先更新主控，再更新节点？" || return 0
+  do_update || return 1
+  blue "等待节点重新连接主控 ..."
+  wait_server || { red "主控未能正常启动"; return 1; }
+  sleep $(( $(cfg_get interval) * 2 + 5 ))
+}
+
+# 修改节点名称：面板立即生效，并同步写入节点本地配置
+rename_node() {
+  local v r
+  v="$(ask "新名称: " "$PICK_NAME")"
+  r="$(pyapi rename id="$PICK_ID" name="$v")"
+  if [ "$r" = "ok" ]; then
+    green "已改名为「$v」，面板即时生效；在线节点会同步写入本地配置（离线节点在上线时同步）"
+  else
+    red "$r"
   fi
+}
+
+# 刷新节点信息：节点立即重新检测系统、位置、IP 协议、虚拟化、CPU、内存/硬盘容量等
+refresh_nodes() {
+  local out ids
+  out="$(pyapi refresh "${1:-all}")" || { yellow "$out"; return 1; }
+  mapfile -t ids < <(printf '%s\n' "$out" | grep .)
+  if [ "${#ids[@]}" -eq 0 ]; then
+    yellow "没有在线节点"
+  else
+    green "已通知 ${#ids[@]} 个节点重新检测，约 10 秒后面板显示新信息（位置与 IP 协议检测需联网，稍慢）"
+  fi
+}
+
+menu_upgrade() {
+  need_installed || return 1
   echo
-  echo " 1. 更新全部节点（只更新客户端不是最新版的在线节点）"
-  echo " 2. 选择单个节点更新"
+  echo " 1. 更新全部节点客户端（只更新客户端不是最新版的在线节点）"
+  echo " 2. 选择单个节点更新客户端"
   echo " 3. SSH 重装旧版客户端（早期安装、不支持自动更新的节点）"
+  echo " 4. 修改节点名称（同步到节点本地配置）"
+  echo " 5. 刷新全部节点信息（立即重新检测系统、位置、IP 协议、CPU、容量等）"
+  echo " 6. 刷新单个节点信息"
   echo " 0. 返回"
   case "$(ask "请选择: ")" in
-    1) upgrade_nodes ;;
-    2) pick_node && upgrade_nodes "$PICK_ID" ;;
+    1) offer_server_update && upgrade_nodes ;;
+    2) offer_server_update && pick_node && upgrade_nodes "$PICK_ID" ;;
     3) update_old_agents ;;
+    4) pick_node && rename_node ;;
+    5) refresh_nodes ;;
+    6) pick_node && refresh_nodes "$PICK_ID" ;;
   esac
 }
 
@@ -629,8 +661,7 @@ menu_edit() {
   echo " 0. 返回"
   local r v
   case "$(ask "请选择: ")" in
-    1) v="$(ask "新名称: " "$PICK_NAME")"
-       r="$(pyapi rename id="$PICK_ID" name="$v")" ;;
+    1) rename_node; return ;;
     2) [ "$(cfg_get sort)" = "manual" ] || yellow "当前为按名称自动排序，排序数字需在「修改设置 → 节点排序方式」切换为手动后才生效"
        v="$(ask "排序数字: ")"
        r="$(pyapi order id="$PICK_ID" order="$v")" ;;

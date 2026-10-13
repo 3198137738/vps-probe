@@ -122,11 +122,13 @@ class Store:
 
     def __init__(self):
         self.lock = threading.Lock()
-        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP}
+        # id -> {"s": 静态数组, "d": 动态数组, "t": 最后上报时间, "o": 排序, "a": 别名, "ip": 来源 IP,
+        #        "pn": 待同步到节点本地配置的新名称}
         self.nodes = {}
         self.conns = {}     # id -> 当前连接对象
         self.removed = {}   # 已在主控删除的节点 id -> 删除时间，重连时通知客户端自行卸载
         self.force_up = set()   # 待强制更新客户端的节点 id（主控手动触发，不受 agent_auto_update 限制）
+        self.refresh = set()    # 待立即重新检测静态信息（系统、位置、协议栈等）的节点 id
         # 三网历史 id -> {"cur": 当前格累计, "list": [[格起始时间, 联通丢包, 联通延迟, 电信.., .., 移动.., ..], ...]}
         self.hist = {}
         self.dirty = False
@@ -225,6 +227,10 @@ class Store:
                 if n["s"] != msg[1:]:
                     n["s"] = msg[1:]
                     self.dirty = True
+                if n.get("pn") and msg[1:2] == [n["pn"]]:   # 新名称已写入节点本地配置
+                    if n.get("a") == n.pop("pn"):
+                        n["a"] = ""
+                    self.dirty = True
             elif msg[0] == "d":
                 n["d"] = msg[1:]
                 n["t"] = time.time()
@@ -314,18 +320,39 @@ class Store:
                    and n.get("sv") and n["sv"] != AGENTS[n.get("os", "linux")][1]]
             for nid in ids:
                 self.force_up.add(nid)
-                try:
-                    self.conns[nid].shutdown(socket.SHUT_RDWR)
-                except Exception:
-                    pass
+                self.kick(nid)
             return ids
+
+    def kick(self, nid):
+        """断开节点连接（调用方需持有锁），客户端会立即重连并获取新的指令"""
+        c = self.conns.get(nid)
+        if c:
+            try:
+                c.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+
+    def refresh_info(self, key=None):
+        """让在线节点立即重新检测系统、位置、协议栈等静态信息，返回已通知的节点 id"""
+        with self.lock:
+            ids = [nid for nid in self.conns if key is None or nid == key]
+            for nid in ids:
+                self.refresh.add(nid)
+                self.kick(nid)
+            return ids
+
+    def offline_reason(self, nid, what):
+        """节点未连接时的提示（调用方需持有锁）：刚断开的节点通常正在重连"""
+        if time.time() - self.nodes.get(nid, {}).get("t", 0) < CFG["offline_timeout"]:
+            return "节点正在重新连接，请稍后再试"
+        return "节点当前离线，上线后才能" + what
 
     def upgrade_reason(self, nid):
         """节点无法更新的原因"""
         with self.lock:
             n = self.nodes.get(nid, {})
             if nid not in self.conns:
-                return "节点当前离线，上线后才能更新"
+                return self.offline_reason(nid, "更新")
             if not n.get("sv"):
                 return "该节点客户端过旧，不支持自动更新，请使用「SSH 重装旧版客户端」"
             return "该节点客户端已是最新版，无需更新"
@@ -339,9 +366,12 @@ class Store:
             return hits[0] if len(hits) == 1 else None
 
     def rename(self, nid, name):
+        """修改名称：面板立即生效，同时同步写入节点本地配置（离线节点在上线时同步）"""
         with self.lock:
             self.nodes[nid]["a"] = name
+            self.nodes[nid]["pn"] = name
             self.dirty = True
+            self.kick(nid)
 
     def set_order(self, nid, order):
         with self.lock:
@@ -484,6 +514,13 @@ class AgentHandler(socketserver.StreamRequestHandler):
             resp["removed"] = str(auth.get("rid", "")) in STORE.removed
         force = nid in STORE.force_up
         STORE.force_up.discard(nid)
+        if nid in STORE.refresh:
+            STORE.refresh.discard(nid)
+            resp["rf"] = 1
+        with STORE.lock:
+            pn = STORE.nodes.get(nid, {}).get("pn")
+        if pn:
+            resp["n"] = pn   # 新名称，客户端写入本地配置
         if agent_sha and (force or CFG.get("agent_auto_update")):
             resp["av"] = agent_sha
             if force:
@@ -654,7 +691,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
-        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update|upgrade&id=..&name=..&order=..
+        # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update|upgrade|refresh&id=..&name=..&order=..
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
@@ -678,6 +715,8 @@ class WebHandler(BaseHTTPRequestHandler):
             return {"ok": 1}
         if action == "upgrade" and q.get("id", "all") == "all":
             return {"ok": 1, "ids": STORE.upgrade()}
+        if action == "refresh" and q.get("id", "all") == "all":
+            return {"ok": 1, "ids": STORE.refresh_info()}
         nid = STORE.find(q.get("id", ""))
         if not nid:
             return {"ok": 0, "msg": "节点不存在"}
@@ -691,6 +730,12 @@ class WebHandler(BaseHTTPRequestHandler):
             ids = STORE.upgrade(nid)
             if not ids:
                 return {"ok": 0, "msg": STORE.upgrade_reason(nid)}
+            return {"ok": 1, "ids": ids}
+        elif action == "refresh":
+            ids = STORE.refresh_info(nid)
+            if not ids:
+                with STORE.lock:
+                    return {"ok": 0, "msg": STORE.offline_reason(nid, "刷新")}
             return {"ok": 1, "ids": ids}
         else:
             return {"ok": 0, "msg": "参数错误"}
