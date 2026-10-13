@@ -320,6 +320,16 @@ class Store:
                     pass
             return ids
 
+    def upgrade_reason(self, nid):
+        """节点无法更新的原因"""
+        with self.lock:
+            n = self.nodes.get(nid, {})
+            if nid not in self.conns:
+                return "节点当前离线，上线后才能更新"
+            if not n.get("sv"):
+                return "该节点客户端过旧，不支持自动更新，请使用「SSH 重装旧版客户端」"
+            return "该节点客户端已是最新版，无需更新"
+
     def find(self, key):
         """按完整 ID、ID 前缀或名称查找节点"""
         with self.lock:
@@ -680,7 +690,7 @@ class WebHandler(BaseHTTPRequestHandler):
         elif action == "upgrade":
             ids = STORE.upgrade(nid)
             if not ids:
-                return {"ok": 0, "msg": "节点离线、已是最新版，或客户端过旧不支持自动更新"}
+                return {"ok": 0, "msg": STORE.upgrade_reason(nid)}
             return {"ok": 1, "ids": ids}
         else:
             return {"ok": 0, "msg": "参数错误"}

@@ -553,7 +553,7 @@ update_old_agents() {
 # 参数为节点 ID，省略则更新全部过期节点
 upgrade_nodes() {
   local out ids n
-  out="$(pyapi upgrade "${1:-all}")" || { red "$out"; return 1; }
+  out="$(pyapi upgrade "${1:-all}")" || { yellow "$out"; return 1; }
   mapfile -t ids < <(printf '%s\n' "$out" | grep .)
   if [ "${#ids[@]}" -eq 0 ]; then
     green "所有在线节点的客户端都已是最新版"
