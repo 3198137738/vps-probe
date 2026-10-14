@@ -191,7 +191,7 @@ if cmd in ("table", "ids", "summary", "old"):
                 print("%s\t%s\t%s" % (n["id"], n["name"], n["ip"]))
     elif cmd == "ids":
         for n in nodes:
-            print("%s\t%s" % (n["id"], n["name"]))
+            print("%s\t%s\t%s" % (n["id"], n["name"], n.get("platform", "linux")))
     elif not nodes:
         print("（暂无节点）")
     else:
@@ -236,9 +236,9 @@ else:
 PY
 }
 
-# 选择节点：结果写入 PICK_ID / PICK_NAME；参数为 all 时直接回车选择全部节点（PICK_ID=all）
+# 选择节点：结果写入 PICK_ID / PICK_NAME / PICK_OS（linux / win）；参数为 all 时直接回车选择全部节点（PICK_ID=all）
 pick_node() {
-  PICK_ID=""; PICK_NAME=""
+  PICK_ID=""; PICK_NAME=""; PICK_OS=""
   pyapi table || return 1
   local lines n
   mapfile -t lines < <(pyapi ids)
@@ -253,8 +253,7 @@ pick_node() {
   if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt "${#lines[@]}" ]; then
     echo "已取消"; return 1
   fi
-  PICK_ID="${lines[$((n - 1))]%%$'\t'*}"
-  PICK_NAME="${lines[$((n - 1))]#*$'\t'}"
+  IFS=$'\t' read -r PICK_ID PICK_NAME PICK_OS <<<"${lines[$((n - 1))]}"
 }
 
 # 对外地址：配置 public_host 优先，否则自动检测并保存
@@ -633,32 +632,53 @@ show_updated_commands() {
   show_commands
 }
 
-# 更新节点：修改名称 → 刷新系统、位置、IP 协议、CPU、容量等信息 → 更新客户端到最新版 → 显示一键安装命令
+# 节点更新命令：在节点上运行一键安装命令并指定名称，原地重装为最新版客户端（节点 ID、流量统计保留）
+# 参数：名称 平台（linux / win）
+node_update_command() {
+  local u q; u="$(install_url)"
+  if [ "$2" = "win" ]; then
+    q="${1//\'/\'\'}"
+    printf "\$Name='%s'; irm %s | iex\n" "$q" "$u"
+  else
+    q="'\\''"; q="${1//\'/$q}"
+    printf "curl -fsSL %s | bash -s -- -n '%s'\n" "$u" "$q"
+  fi
+}
+
+# 更新节点
+#   单个节点：输入名称后给出更新命令，在节点上运行即完成改名、刷新系统 / 位置 / IP 协议 / CPU / 容量等信息、更新到最新版客户端
+#   全部节点：由主控通知在线节点刷新信息并更新客户端，无需登录节点
 menu_upgrade() {
   need_installed || return 1
   pick_node all || return 0
-  local name="" r
-  if [ "$PICK_ID" != "all" ]; then
-    name="$(ask "节点名称（直接回车保持「$PICK_NAME」）: " "$PICK_NAME")"
+  if [ "$PICK_ID" = "all" ]; then
+    offer_server_update || return 1
+    echo
+    blue "==== 1/2 刷新全部节点信息（系统、位置、IP 协议、CPU、容量等） ===="
+    refresh_nodes
+    echo
+    blue "==== 2/2 更新全部节点客户端到最新版 ===="
+    upgrade_nodes
+    show_updated_commands
+    return
   fi
+  local name r
+  name="$(ask "节点名称（直接回车保持「$PICK_NAME」）: " "$PICK_NAME")"
   offer_server_update || return 1
-  echo
-  blue "==== 1/3 更新名称 ===="
-  if [ -z "$name" ]; then
-    echo "全部节点：保持原名称（单个节点可修改）"
-  elif [ "$name" = "$PICK_NAME" ]; then
-    echo "名称未变化：$name"
-  else
+  if [ "$name" != "$PICK_NAME" ]; then
     r="$(pyapi rename id="$PICK_ID" name="$name")"
-    [ "$r" = "ok" ] && green "已改名为「$name」，面板即时生效，并同步写入节点本地配置" || red "$r"
+    [ "$r" = "ok" ] || { red "$r"; return 1; }
   fi
   echo
-  blue "==== 2/3 刷新节点信息（系统、位置、IP 协议、CPU、容量等） ===="
-  refresh_nodes "$PICK_ID"
+  if [ "$PICK_OS" = "win" ]; then
+    green "在节点「$name」上执行（右键「以管理员身份运行」PowerShell）："
+  else
+    green "在节点「$name」上执行（root）："
+  fi
+  node_update_command "$name" "$PICK_OS"
   echo
-  blue "==== 3/3 更新客户端到最新版 ===="
-  upgrade_nodes "$PICK_ID"
-  show_updated_commands
+  echo "运行后自动完成：更新名称 → 刷新系统、位置、IP 协议、CPU、容量等信息 → 客户端更新到最新版"
+  echo "节点 ID、排序与流量统计均保留，面板中原节点即时更新"
 }
 
 menu_add() {
