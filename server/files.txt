@@ -9,14 +9,4 @@ install.sh
 install.ps1
 server/web/index.html
 server/web/favicon.ico
-server/web/css/bootstrap.min.css
-server/web/css/bootstrap-theme.min.css
-server/web/css/light.css
-server/web/css/dark.css
-server/web/js/jquery.min.js
-server/web/js/bootstrap.min.js
-server/web/js/serverstatus.js
-server/web/js/html5shiv.js
-server/web/js/respond.min.js
-server/web/img/light.png
-server/web/img/dark.png
+server/web/css/app.css

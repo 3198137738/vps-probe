@@ -422,7 +422,7 @@ class Store:
         return body, gz
 
     def ss_stats(self):
-        """转换为 ServerStatus 1.0.9 前端使用的 json/stats.json 格式，1 秒内复用缓存"""
+        """转换为前端使用的 json/stats.json 格式（沿用 ServerStatus 字段名），1 秒内复用缓存"""
         now = time.time()
         if now - self.ss_cache[0] < 1:
             return self.ss_cache[1], self.ss_cache[2]
@@ -471,7 +471,7 @@ class Store:
                     "cpu_info": html.escape("%s | %s 核" % (s[10] or "未知", s[4])),
                     "custom": html.escape("系统: %s (%s)" % (s[8], s[9])),
                 })
-        body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7]},
+        body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7], "title": CFG["title"]},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         gz = gzip.compress(body, 6)
         self.ss_cache = (now, body, gz)

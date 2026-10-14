@@ -1,8 +1,8 @@
 # 云监控探针
 
-轻量级 VPS 探针，前端采用 [ServerStatus 1.0.9](https://github.com/cppla/ServerStatus/tree/1.0.9)（cppla，MIT 许可）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
+轻量级 VPS 探针，前端为单页 Tailwind 界面（表格 / 卡片两种视图，深浅色主题）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
 
-监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点行可展开详情（内存/虚存、硬盘/读写、TCP/UDP/进程/线程、三网延迟）。
+监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点可展开详情（处理器/系统、内存/Swap、硬盘/读写、TCP/UDP/进程/线程、本月流量、三网 24 小时延迟曲线与实时吞吐曲线）。
 
 **三网丢包图**：表格最后一列显示联通 / 电信 / 移动的实时丢包率，鼠标悬停可查看 24 小时丢包图（每 20 分钟一格，颜色表示丢包率、高度表示延迟）。数据由节点到三网探测目标的 TCP 握手测得（出站方向），主控自动记录，无需任何设置；历史保存在 `/opt/probe-server/history.json`。
 
@@ -139,13 +139,21 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 - 国家/协议栈识别每 6 小时一次
 - 网页与接口 gzip 压缩，静态资源协商缓存（未变化返回 304），标签页隐藏时自动停止刷新
 
+## 修改前端
+
+`server/web/css/app.css` 由 Tailwind v3 根据 `index.html` 中用到的类名预编译生成（页面不依赖 CDN）。修改 `index.html` 新增了类名后需重新生成：
+
+```bash
+SRC=server/web/index.html npx tailwindcss@3 -c server/tailwind.config.js -o server/web/css/app.css --minify
+```
+
 ## 目录结构
 
 ```
 agent/agent.py        Linux 客户端
 agent/agent.ps1       Windows 客户端（PowerShell）
 server/server.py      服务端（TCP 上报 + HTTP 网页）
-server/web/           前端页面（ServerStatus 1.0.9，数据接口 /json/stats.json 由服务端转换提供）
+server/web/           前端页面（Tailwind 预编译为 css/app.css，数据接口 /json/stats.json 与 /json/ping24h.json）
 probe.sh              主控管理脚本（安装 / 更新 / 节点管理 / 设置 / 卸载）
 install.sh            Linux 客户端安装 / 卸载
 install.ps1           Windows 客户端安装 / 卸载

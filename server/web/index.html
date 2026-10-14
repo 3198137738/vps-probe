@@ -1,139 +1,1101 @@
 <!DOCTYPE html>
-<!--
-        json字段保持完整, 自行自定义前端展示
-        ლ(•̀ _ •́ ლ)
-        ლ(•̀ _ •́ ლ)ლ(•̀ _ •́ ლ)
-        ლ(•̀ _ •́ ლ)ლ(•̀ _ •́ ლ)ლ(•̀ _ •́ ლ)
-        ლ(•̀ _ •́ ლ)ლ(•̀ _ •́ ლ)
-        ლ(•̀ _ •́ ლ)
-        follow me, better solution for you. by:https://cpp.la
--->
-<html>
-	<head>
-		<title>云监控</title>
-		<meta charset="utf-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="description" content="云监控">
-		<meta name="author" content="BotoX">
-		<link rel="stylesheet" href="css/bootstrap.min.css">
-		<link rel="stylesheet" href="css/bootstrap-theme.min.css">
-		<link rel="stylesheet" href="css/light.css" title="light">
-		<link rel="stylesheet" href="css/dark.css" title="dark">
-		<style>
-			body {
-				padding-top: 70px;
-				padding-bottom: 30px;
-			}
-			/* 三网 24 小时丢包图：悬停三网列弹出 */
-			/* 为显示弹窗取消了外层裁剪，圆角和文字溢出需单独处理 */
-			#servers td#ping { min-width: 135px; }
-			#servers td#ping .progress { overflow: visible; }
-			#servers td#ping .progress-bar { position: relative; border-radius: 4px; }
-			#servers td#ping .progress-bar > span { display: block; white-space: nowrap; overflow: hidden; }
-			#servers td#ping .p24-pop {
-				display: none; position: absolute; right: 0; top: 24px; z-index: 1000;
-				background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px; text-shadow: none;
-				box-shadow: 0 4px 12px rgba(0,0,0,.3); padding: 8px 12px;
-			}
-			#servers td#ping .progress-bar:hover .p24-pop:not(:empty) { display: block; }
-			.p24 { width: 600px; max-width: 90vw; font-size: 12px; line-height: 1.5; text-align: left; display: inline-block; }
-			.p24-head { font-weight: bold; margin-bottom: 6px; }
-			.p24-head span { font-weight: normal; color: #888; margin-left: 8px; }
-			.p24-row { display: flex; align-items: flex-end; margin: 6px 0; }
-			.p24-name { width: 36px; font-weight: bold; }
-			.p24-bars { flex: 1; display: flex; align-items: flex-end; height: 24px; }
-			.p24-bars i { flex: 1; margin-right: 1px; border-radius: 1px; background: #4caf50; }
-			.p24-sum { width: 110px; text-align: right; color: #666; white-space: nowrap; }
-			.p24-axis { display: flex; justify-content: space-between; margin: 0 110px 0 36px; color: #888; }
-			.p24-legend { margin-top: 4px; color: #888; }
-			.p24-legend b { display: inline-block; width: 9px; height: 9px; margin: 0 3px 0 8px; border-radius: 1px; }
-			.p24 .c0 { background: #4caf50; }
-			.p24 .c1 { background: #d4c400; }
-			.p24 .c2 { background: #f44336; }
-			.p24 .c3 { background: #8b1a1a; }
-			.p24 .cx { background: #9e9e9e; }
-			.p24-bars i.ce { background: rgba(128,128,128,.18); }
-		</style>
-		<!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-		<!--[if lt IE 9]>
-			<script src="js/html5shiv.js"></script>
-			<script src="js/respond.min.js"></script>
-		<![endif]-->
-	</head>
-	<body>
-		<div role="navigation" class="navbar navbar-inverse navbar-fixed-top">
-			<div class="navbar-inner">
-				<div class="container">
-					<div class="navbar-header">
-						<button data-target=".navbar-collapse" data-toggle="collapse" class="navbar-toggle" type="button">
-							<span class="sr-only">Toggle navigation</span>
-							<span class="icon-bar"></span>
-							<span class="icon-bar"></span>
-							<span class="icon-bar"></span>
-						</button>
-						<a href="#" class="navbar-brand">云监控</a>
-					</div>
-					<div class="navbar-collapse collapse">
-						<ul class="nav navbar-nav">
-							<li class="dropdown">
-								<a data-toggle="dropdown" class="dropdown-toggle" href="#">风格<b class="caret"></b></a>
-								<ul class="dropdown-menu">
-									<li><a href="#" onclick="setActiveStyleSheet('dark', true)">黑夜</a></li>
-									<li><a href="#" onclick="setActiveStyleSheet('light', true)">白天</a></li>
-								</ul>
-							</li>
-						</ul>
-					</div><!--/.nav-collapse -->
-				</div>
-			</div>
-		</div>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云监控</title>
+    <link rel="icon" href="favicon.ico">
+    <link rel="stylesheet" href="css/app.css">
+    <script>
+        // 主题在渲染前确定，避免浅色用户看到深色闪烁
+        if (localStorage.getItem('ss_theme') === 'light') document.documentElement.classList.remove('dark');
+    </script>
+    <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        /* 进度条宽度与颜色平滑过渡 */
+        .ss-bar-fill {
+            transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+        }
+        /* 实时同步呼吸灯 */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.45; transform: scale(0.92); }
+        }
+        .live-dot {
+            animation: pulse-dot 1.8s ease-in-out infinite;
+        }
+        /* 展开详情 */
+        .accordion-content {
+            animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.45);
+        }
+    </style>
+</head>
+<body class="bg-canvas-light dark:bg-canvas-dark text-slate-800 dark:text-slate-100 font-sans min-h-screen flex flex-col selection:bg-emerald-500/20 selection:text-emerald-400 transition-colors duration-200">
 
-		<div class="container content">
-			<div id="loading-notice">
-				<noscript>
-					<div class="alert alert-danger" style="text-align: center;">
-						<strong>Enable JavaScript</strong> , please do it.
-					</div>
-				</noscript>
-				<div style="text-align: center;">
-					警告:如果出现此消息，请确保您已启用Javascript! <br />否则云监控主服务没启动或已关闭.
-				</div>
-				<p></p>
-			</div>
-			<table class="table table-striped table-condensed table-hover">
-				<thead>
-				<tr>
-					<th id="online_status" style="text-align: center;">🔗协议</th>
-					<th id="month_traffic" style="text-align: center;">📊月流量↓|↑</th>
-					<th id="name">📌节点</th>
-					<th id="type">🗂️虚拟化</th>
-					<th id="location">🌍位置</th>
-					<th id="uptime">⏱️在线</th>
-					<th id="load">负载</th>
-					<th id="network">🚦网络↓|↑</th>
-					<th id="traffic">📋总流量↓|↑</th>
-					<th id="cpu">🎯核芯</th>
-					<th id="ram">⚡️内存</th>
-					<th id="hdd">💾硬盘</th>
-					<th id="ping">🌐CU|CT|CM</th>
-				</tr>
-				</thead>
-				<tbody id="servers">
-				<!-- Servers here \o/ -->
-				</tbody>
-			</table>
-			<br />
-			<div id="updated">Updating...</div>
-		</div>
+    <header class="sticky top-0 z-30 backdrop-blur-md bg-white/85 dark:bg-[#0b0f17]/85 border-b border-slate-200/80 dark:border-slate-800/80">
+        <div class="max-w-[1440px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
 
-		<div class="container">
-			<p style="text-align: center; font-size: 10px;">
-				<a href="https://github.com/cppla/ServerStatus">ServerStatus中文版</a>
-			</p>
-		</div>
-		<script src="js/jquery.min.js"></script>
-		<script src="js/bootstrap.min.js"></script>
-		<script src="js/serverstatus.js"></script>
-	</body>
+            <!-- 左：标题 + 实时同步状态 -->
+            <div class="flex items-center gap-3 shrink-0">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-slate-900 dark:bg-emerald-500/15 border border-slate-800 dark:border-emerald-500/30 flex items-center justify-center text-white dark:text-emerald-400">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                    </div>
+                    <span id="brandTitle" class="font-semibold tracking-tight text-sm sm:text-base text-slate-900 dark:text-white">云监控</span>
+                </div>
+
+                <button id="syncToggleBtn" onclick="toggleSync()" title="点击暂停或恢复实时刷新" class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums border border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15 transition">
+                    <span id="syncDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"></span>
+                    <span id="syncText">连接中…</span>
+                </button>
+            </div>
+
+            <!-- 中：汇总（宽屏显示） -->
+            <div class="hidden xl:flex items-center gap-2 text-xs font-mono tabular-nums">
+                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
+                    <span class="text-slate-400 dark:text-slate-500 font-sans">节点</span>
+                    <span id="hdrOnlineText" class="font-semibold text-slate-800 dark:text-slate-200">- / - 在线</span>
+                </div>
+                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
+                    <span class="text-slate-400 dark:text-slate-500 font-sans">总带宽</span>
+                    <span class="text-emerald-600 dark:text-emerald-400 font-medium">↓ <span id="hdrTotalRx">0 KB/s</span></span>
+                    <span class="text-slate-300 dark:text-slate-700">·</span>
+                    <span class="text-sky-600 dark:text-sky-400 font-medium">↑ <span id="hdrTotalTx">0 KB/s</span></span>
+                </div>
+                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
+                    <span class="text-slate-400 dark:text-slate-500 font-sans">本月总流量</span>
+                    <span id="hdrTotalTraffic" class="font-semibold text-slate-800 dark:text-slate-200">0</span>
+                </div>
+            </div>
+
+            <!-- 右：工具按钮 -->
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <div class="relative w-32 sm:w-48 md:w-56">
+                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input
+                        id="searchInput"
+                        type="text"
+                        oninput="handleSearch(this.value)"
+                        placeholder="筛选节点 / 地区 / 系统..."
+                        class="w-full pl-8 pr-6 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-slate-400 dark:focus:border-slate-600 transition"
+                    />
+                    <kbd class="hidden sm:inline-block absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-400">/</kbd>
+                </div>
+
+                <!-- 进度条文字：百分比 / 容量 -->
+                <button id="barTextModeBtn" onclick="toggleBarTextMode()" title="切换进度条内部显示：百分比 (%) 或 容量 (GB)" class="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition">
+                    <span id="barTextModeLabel">%</span>
+                </button>
+
+                <!-- 表格 / 卡片 -->
+                <div class="flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900">
+                    <button id="btnViewTable" onclick="switchView('table')" title="紧凑表格">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                        <span class="hidden sm:inline">表格</span>
+                    </button>
+                    <button id="btnViewCards" onclick="switchView('cards')" title="卡片视图">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                        <span class="hidden sm:inline">卡片</span>
+                    </button>
+                </div>
+
+                <!-- 主题 -->
+                <button onclick="toggleTheme()" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition" title="切换深浅色主题">
+                    <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                    <svg class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-6 py-4 space-y-3.5">
+
+        <!-- 分组筛选 + 窄屏汇总 -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div id="groupPillsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"></div>
+
+            <div class="flex xl:hidden items-center gap-3 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                <span>在线: <strong id="mobOnlineText" class="text-slate-800 dark:text-slate-200">-/-</strong></span>
+                <span class="text-emerald-500">↓ <span id="mobTotalRx">0K</span></span>
+                <span class="text-sky-500">↑ <span id="mobTotalTx">0K</span></span>
+            </div>
+        </div>
+
+        <div id="mainViewContainer"></div>
+
+    </main>
+
+    <footer class="border-t border-slate-200/70 dark:border-slate-800/60 py-3.5 mt-8">
+        <div class="max-w-[1440px] mx-auto px-3 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+            <div class="flex items-center gap-2">
+                <span>版本 <span id="footerVersion" class="text-slate-600 dark:text-slate-300">-</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="font-sans">点击任意节点可展开 <code class="font-mono text-emerald-500">t/u/p/d</code> 与三网延迟曲线</span>
+                <span>·</span>
+                <span class="font-sans">更新于</span>
+                <span id="footerTimestamp" class="tabular-nums">--:--:--</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const REFRESH_MS = 3000;
+        const NET_POINTS = 40;              // 实时吞吐保留最近 40 次刷新（约 2 分钟）
+        const ISSUE = '__ISSUE__';
+
+        let servers = [];
+        let loaded = false;
+        let pageVersion = '';
+        let currentView = localStorage.getItem('ss_view') === 'cards' ? 'cards' : 'table';
+        let currentGroup = 'ALL';          // 'ALL' | 国家代码 | ISSUE
+        let searchQuery = '';
+        let barShowCapacity = localStorage.getItem('ss_cap') === '1';
+        let expandedServerId = null;
+        let activeChartTab = 'ping';       // 'ping' 三网 24 小时延迟 | 'net' 实时吞吐
+        let syncRunning = true;
+        let syncTimer = null;
+        let fetching = false;
+
+        const netHistory = {};             // id -> { rx: [], tx: [] }，单位 MB/s
+        const p24 = { at: 0, data: null }; // json/ping24h.json，每分钟拉取一次
+
+        let regionDisplay = null;
+        try { regionDisplay = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); } catch (e) {}
+
+        function regionName(cc) {
+            if (!/^[A-Z]{2}$/.test(cc)) return '未知地区';
+            try { return regionDisplay ? regionDisplay.of(cc) : cc; } catch (e) { return cc; }
+        }
+
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function pct(used, total) {
+            return total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
+        }
+
+        function isOnline(s) {
+            return Boolean(s.online4 || s.online6);
+        }
+
+        function formatBytesRate(bytesPerSec, compact = false) {
+            if (!bytesPerSec || bytesPerSec <= 0) return compact ? '0K' : '0 KB/s';
+            const mb = bytesPerSec / (1024 * 1024);
+            if (mb >= 1) {
+                return compact ? `${mb.toFixed(1)}M` : `${mb.toFixed(1)} MB/s`;
+            }
+            const kb = bytesPerSec / 1024;
+            return compact ? `${kb.toFixed(0)}K` : `${kb.toFixed(0)} KB/s`;
+        }
+
+        function formatTraffic(bytes) {
+            if (!bytes || bytes <= 0) return '0';
+            const units = ['B', 'K', 'M', 'G', 'T', 'P'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+            return bytes.toFixed(i >= 4 ? 2 : (i === 3 && bytes < 100 ? 1 : 0)) + units[i];
+        }
+
+        function formatGB(gb) {
+            return gb >= 10 ? gb.toFixed(0) : gb.toFixed(1);
+        }
+
+        function formatRamCap(usedMB, totalMB) {
+            return `${(usedMB / 1024).toFixed(1)}/${formatGB(totalMB / 1024)}G`;
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '-';
+            const t = new Date(ts * 1000), p = n => ('0' + n).slice(-2);
+            return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+        }
+
+        function fmtHM(ts) {
+            const t = new Date(ts * 1000);
+            return ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+        }
+
+        function fmtLoss(loss) {
+            return (loss > 0 && loss < 10 ? loss.toFixed(1) : Math.round(loss)) + '%';
+        }
+
+        // 胶囊进度条颜色（<60% 绿，60-85% 黄，>85% 红）
+        function getCapsuleColorClass(p, online = true) {
+            if (!online) return 'bg-slate-400/30 dark:bg-slate-700/40';
+            if (p >= 85) return 'bg-rose-500/90 dark:bg-rose-500/85';
+            if (p >= 60) return 'bg-amber-500/90 dark:bg-amber-500/85';
+            return 'bg-emerald-500/85 dark:bg-emerald-500/80';
+        }
+
+        function getPingClass(ms) {
+            if (!ms || ms <= 0) return 'text-rose-500';
+            if (ms < 60) return 'text-emerald-600 dark:text-emerald-400';
+            if (ms < 140) return 'text-amber-600 dark:text-amber-400';
+            return 'text-orange-500 dark:text-orange-400';
+        }
+
+        function pingText(ms) {
+            return ms > 0 ? ms : '-';
+        }
+
+        // 地区标识
+        function renderFlagBadge(code) {
+            const map = {
+                CN: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25',
+                HK: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/25',
+                JP: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/25',
+                SG: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+                TW: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+                US: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
+                DE: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',
+                NL: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/25',
+                KR: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25',
+                GB: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/25',
+                FR: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/25',
+                RU: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/25'
+            };
+            const cls = map[code] || 'bg-slate-500/15 text-slate-500 border-slate-500/25';
+            const label = /^[A-Z]{2}$/.test(code) ? code : '--';
+            return `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-semibold rounded border ${cls} shrink-0" title="${esc(regionName(code))}">${label}</span>`;
+        }
+
+        // json/stats.json -> 页面内部格式。cpu_info / custom 已由服务端转义
+        function ingestStats(list) {
+            servers = list.map(it => {
+                const sys = String(it.custom || '').replace(/^系统:\s*/, '');
+                const s = {
+                    id: String(it.id || ''),
+                    name: it.name || it.id || '-',
+                    location: String(it.location || '').toUpperCase(),
+                    type: String(it.type || '-').toUpperCase(),
+                    sys: sys || '-',
+                    os: sys.split(' (')[0].split(' ')[0] || '-',
+                    cpuInfo: it.cpu_info || '-',
+                    online4: Boolean(it.online4),
+                    online6: Boolean(it.online6),
+                    uptime: it.uptime || '-',
+                    boot_time: it.boot_time || 0,
+                    load_1: Number(it.load_1) || 0,
+                    cpu: Number(it.cpu) || 0,
+                    network_rx: it.network_rx || 0,
+                    network_tx: it.network_tx || 0,
+                    network_in: it.network_in || 0,
+                    network_out: it.network_out || 0,
+                    month_in: Math.max(0, (it.network_in || 0) - (it.last_network_in || 0)),
+                    month_out: Math.max(0, (it.network_out || 0) - (it.last_network_out || 0)),
+                    memory_total: (it.memory_total || 0) / 1024,   // KB -> MB
+                    memory_used: (it.memory_used || 0) / 1024,
+                    swap_total: (it.swap_total || 0) / 1024,
+                    swap_used: (it.swap_used || 0) / 1024,
+                    hdd_total: (it.hdd_total || 0) / 1024,         // MB -> GB
+                    hdd_used: (it.hdd_used || 0) / 1024,
+                    io_read: it.io_read || 0,
+                    io_write: it.io_write || 0,
+                    tcp_count: it.tcp_count || 0,
+                    udp_count: it.udp_count || 0,
+                    process_count: it.process_count || 0,
+                    thread_count: it.thread_count || 0,
+                    time_189: it.time_189 || 0,
+                    time_10010: it.time_10010 || 0,
+                    time_10086: it.time_10086 || 0,
+                    loss_189: it.ping_189 || 0,
+                    loss_10010: it.ping_10010 || 0,
+                    loss_10086: it.ping_10086 || 0
+                };
+                s.regionName = regionName(s.location);
+
+                const online = isOnline(s);
+                const h = netHistory[s.id] || (netHistory[s.id] = { rx: [], tx: [] });
+                h.rx.push(online ? s.network_rx / 1048576 : 0);
+                h.tx.push(online ? s.network_tx / 1048576 : 0);
+                if (h.rx.length > NET_POINTS) { h.rx.shift(); h.tx.shift(); }
+                return s;
+            });
+        }
+
+        function updateHeaderSummary() {
+            const total = servers.length;
+            const onlineList = servers.filter(isOnline);
+            const onlineCount = onlineList.length;
+
+            const totalRx = onlineList.reduce((acc, s) => acc + s.network_rx, 0);
+            const totalTx = onlineList.reduce((acc, s) => acc + s.network_tx, 0);
+            const monthBytes = servers.reduce((acc, s) => acc + s.month_in + s.month_out, 0);
+
+            document.getElementById('hdrOnlineText').textContent = `${onlineCount} / ${total} 在线`;
+            document.getElementById('hdrTotalRx').textContent = formatBytesRate(totalRx, false);
+            document.getElementById('hdrTotalTx').textContent = formatBytesRate(totalTx, false);
+            document.getElementById('hdrTotalTraffic').textContent = formatTraffic(monthBytes);
+
+            document.getElementById('mobOnlineText').textContent = `${onlineCount}/${total}`;
+            document.getElementById('mobTotalRx').textContent = formatBytesRate(totalRx, true);
+            document.getElementById('mobTotalTx').textContent = formatBytesRate(totalTx, true);
+        }
+
+        function isIssue(s) {
+            return !isOnline(s) || s.cpu >= 80;
+        }
+
+        // 分组：全部 + 各地区（多于一个地区时）+ 异常/离线
+        function renderGroupPills() {
+            const counts = {};
+            servers.forEach(s => { counts[s.location] = (counts[s.location] || 0) + 1; });
+            const regions = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+            const groups = [['ALL', `全部节点 (${servers.length})`]];
+            if (regions.length > 1) regions.forEach(r => groups.push([r, `${regionName(r)} (${counts[r]})`]));
+            groups.push([ISSUE, `异常/离线 (${servers.filter(isIssue).length})`]);
+            if (!groups.some(g => g[0] === currentGroup)) currentGroup = 'ALL';
+
+            setHtml(document.getElementById('groupPillsContainer'), groups.map(([g, label]) => {
+                const active = currentGroup === g;
+                const cls = active
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-medium'
+                    : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200';
+                return `<button onclick="selectGroup(this.dataset.g)" data-g="${esc(g)}" class="px-2.5 py-1 rounded-lg text-xs transition whitespace-nowrap ${cls}">${esc(label)}</button>`;
+            }).join(''));
+        }
+
+        function getFilteredServers() {
+            const q = searchQuery.trim().toLowerCase();
+            return servers.filter(s => {
+                if (currentGroup === ISSUE) {
+                    if (!isIssue(s)) return false;
+                } else if (currentGroup !== 'ALL' && s.location !== currentGroup) {
+                    return false;
+                }
+                if (q) {
+                    const hay = `${s.name} ${s.regionName} ${s.location} ${s.type} ${s.sys} ${s.cpuInfo}`.toLowerCase();
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            });
+        }
+
+        // 只在内容变化时才替换，避免每次刷新重建导致闪烁、悬停提示消失
+        function setHtml(el, html) {
+            if (el._html !== html) {
+                el._html = html;
+                el.innerHTML = html;
+            }
+        }
+
+        function renderMainView() {
+            const container = document.getElementById('mainViewContainer');
+            if (!loaded) {
+                setHtml(container, `
+                    <div class="p-12 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">正在加载节点数据…</p>
+                    </div>
+                `);
+                return;
+            }
+
+            const list = getFilteredServers();
+            if (list.length === 0) {
+                setHtml(container, `
+                    <div class="p-12 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">${servers.length ? '没有匹配的服务器节点' : '还没有节点接入'}</p>
+                        ${servers.length ? `<button onclick="resetFilterState()" class="mt-2.5 px-3 py-1 rounded-lg text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900">重置筛选</button>` : ''}
+                    </div>
+                `);
+                return;
+            }
+
+            setHtml(container, currentView === 'table' ? renderClassicTable(list) : renderCards(list));
+
+            if (expandedServerId) {
+                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
+            }
+        }
+
+        function renderClassicTable(list) {
+            return `
+                <div class="rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#111827] overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200/80 dark:border-slate-800/90 bg-slate-50/90 dark:bg-slate-900/70 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+                                    <th class="py-2.5 pl-3.5 pr-2 w-20">状态</th>
+                                    <th class="py-2.5 px-2.5 min-w-[175px]">节点</th>
+                                    <th class="py-2.5 px-2 w-28">虚拟化 / 系统</th>
+                                    <th class="py-2.5 px-2 w-20 text-right">在线</th>
+                                    <th class="py-2.5 px-2 w-16 text-right">负载</th>
+                                    <th class="py-2.5 px-2.5 w-32 text-right">网络速率 (↓/↑)</th>
+                                    <th class="py-2.5 px-2.5 w-28 text-right hidden lg:table-cell">月流量 (↓/↑)</th>
+                                    <th class="py-2.5 px-2 w-28 text-center">CPU</th>
+                                    <th class="py-2.5 px-2 w-32 text-center">内存 <span class="text-[9px] font-normal text-slate-400">(含Swap)</span></th>
+                                    <th class="py-2.5 px-2 w-28 text-center hidden md:table-cell">硬盘</th>
+                                    <th class="py-2.5 pl-2 pr-3.5 w-32 text-right hidden xl:table-cell">三网 (电/联/移)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/60 dark:divide-slate-800/70 text-xs font-mono tabular-nums">
+                                ${list.map(s => renderTableRowAndAccordion(s)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTableRowAndAccordion(s) {
+            const online = isOnline(s);
+            const isExpanded = expandedServerId === s.id;
+            const ramPct = online ? pct(s.memory_used, s.memory_total) : 0;
+            const swapPct = online ? pct(s.swap_used, s.swap_total) : 0;
+            const hddPct = pct(s.hdd_used, s.hdd_total);
+
+            let statusBadge;
+            if (!online) {
+                statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">OFFLINE</span>`;
+            } else {
+                const label = s.online4 && s.online6 ? 'v4/v6' : (s.online6 ? 'IPv6' : 'IPv4');
+                statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${label}</span>`;
+            }
+
+            const cpuText = online ? `${s.cpu}%` : '-';
+            const ramText = !online ? '-' : (barShowCapacity ? formatRamCap(s.memory_used, s.memory_total) : `${ramPct}%`);
+            const hddText = barShowCapacity ? `${formatGB(s.hdd_used)}/${formatGB(s.hdd_total)}G` : `${hddPct}%`;
+
+            const rowHighlight = isExpanded
+                ? 'bg-slate-100/90 dark:bg-[#161f30]'
+                : 'hover:bg-slate-50/90 dark:hover:bg-[#161f30]/70';
+
+            return `
+                <tr onclick="toggleExpandRow('${esc(s.id)}')" class="cursor-pointer transition-colors ${rowHighlight} ${!online ? 'opacity-75' : ''}">
+                    <td class="py-2.5 pl-3.5 pr-2 whitespace-nowrap">
+                        ${statusBadge}
+                    </td>
+
+                    <td class="py-2.5 px-2.5 font-sans">
+                        <div class="flex items-center gap-2">
+                            ${renderFlagBadge(s.location)}
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">${esc(s.name)}</span>
+                                    <svg class="w-3 h-3 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-emerald-500' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                                </div>
+                                <div class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[165px]">${esc(s.regionName)}</div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-2 whitespace-nowrap">
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">${esc(s.type)}</span>
+                            <span class="text-[11px] text-slate-500 dark:text-slate-400 font-sans" title="${s.sys}">${s.os}</span>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-2 text-right whitespace-nowrap font-sans text-xs ${online ? 'text-slate-700 dark:text-slate-300' : 'text-rose-500 font-medium'}">
+                        ${online ? esc(s.uptime) : '离线'}
+                    </td>
+
+                    <td class="py-2.5 px-2 text-right whitespace-nowrap" title="1 分钟负载">
+                        <span class="${s.load_1 >= 1.5 ? 'text-amber-500 font-semibold' : 'text-slate-700 dark:text-slate-300'}">${online ? s.load_1.toFixed(2) : '-'}</span>
+                    </td>
+
+                    <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px]">
+                        <div class="flex items-center justify-end gap-1.5">
+                            <span class="text-emerald-600 dark:text-emerald-400">↓${online ? formatBytesRate(s.network_rx, true) : '0K'}</span>
+                            <span class="text-slate-300 dark:text-slate-700">/</span>
+                            <span class="text-sky-600 dark:text-sky-400">↑${online ? formatBytesRate(s.network_tx, true) : '0K'}</span>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400 hidden lg:table-cell" title="累计 ↓${formatTraffic(s.network_in)} / ↑${formatTraffic(s.network_out)}">
+                        ${formatTraffic(s.month_in)} / ${formatTraffic(s.month_out)}
+                    </td>
+
+                    <td class="py-2.5 px-2">
+                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="CPU: ${s.cpu}% (${s.cpuInfo})">
+                            <div class="h-full ${getCapsuleColorClass(s.cpu, online)} ss-bar-fill" style="width: ${online ? Math.min(100, s.cpu) : 0}%"></div>
+                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${cpuText}</span>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-2">
+                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="内存: ${s.memory_used.toFixed(0)} MB / ${s.memory_total.toFixed(0)} MB | Swap: ${s.swap_used.toFixed(0)} MB / ${s.swap_total.toFixed(0)} MB (${swapPct}%)">
+                            <div class="h-full ${getCapsuleColorClass(ramPct, online)} ss-bar-fill" style="width: ${ramPct}%"></div>
+                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${ramText}</span>
+                            <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/20">
+                                <div class="h-full bg-indigo-400 ss-bar-fill" style="width: ${swapPct}%"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-2 hidden md:table-cell">
+                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="硬盘: ${s.hdd_used.toFixed(1)} GB / ${s.hdd_total.toFixed(1)} GB">
+                            <div class="h-full ${getCapsuleColorClass(hddPct, online)} ss-bar-fill" style="width: ${hddPct}%"></div>
+                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${hddText}</span>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 pl-2 pr-3.5 text-right whitespace-nowrap text-[11px] hidden xl:table-cell">
+                        ${online ? `
+                            <span class="${getPingClass(s.time_189)}">${pingText(s.time_189)}</span>
+                            <span class="text-slate-300 dark:text-slate-700">/</span>
+                            <span class="${getPingClass(s.time_10010)}">${pingText(s.time_10010)}</span>
+                            <span class="text-slate-300 dark:text-slate-700">/</span>
+                            <span class="${getPingClass(s.time_10086)}">${pingText(s.time_10086)}</span>
+                            <span class="text-[10px] text-slate-400">ms</span>
+                        ` : `<span class="text-rose-500">TIMEOUT</span>`}
+                    </td>
+                </tr>
+                ${isExpanded ? `
+                <tr class="bg-slate-50/90 dark:bg-[#0e1420] border-b border-slate-200 dark:border-slate-800">
+                    <td colspan="11" class="p-0">
+                        ${renderExpandedDetailPanel(s)}
+                    </td>
+                </tr>
+                ` : ''}
+            `;
+        }
+
+        function renderExpandedDetailPanel(s) {
+            const online = isOnline(s);
+            const swapPct = pct(s.swap_used, s.swap_total);
+
+            return `
+                <div class="accordion-content p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 font-sans">
+
+                    <!-- 左：硬件信息、t/u/p/d、本月流量 -->
+                    <div class="lg:col-span-5 flex flex-col justify-between space-y-3.5 bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90">
+                        <div class="space-y-2.5 text-xs">
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                                <span class="text-slate-400 shrink-0">处理器</span>
+                                <span class="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate" title="${s.cpuInfo}">${s.cpuInfo}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                                <span class="text-slate-400 shrink-0">系统 / 架构</span>
+                                <span class="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 truncate" title="${s.sys}">${s.sys}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                                <span class="text-slate-400 shrink-0">内存 / Swap</span>
+                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
+                                    ${s.memory_used.toFixed(0)} / ${s.memory_total.toFixed(0)} MB · Swap ${s.swap_used.toFixed(0)}/${s.swap_total.toFixed(0)}M (${swapPct}%)
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                                <span class="text-slate-400 shrink-0">硬盘 / 负载</span>
+                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
+                                    ${s.hdd_used.toFixed(1)}/${s.hdd_total.toFixed(1)} GB · Load ${online ? s.load_1.toFixed(2) : '-'}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                                <span class="text-slate-400 shrink-0">磁盘 IO</span>
+                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
+                                    读 ${online ? formatBytesRate(s.io_read) : '-'} · 写 ${online ? formatBytesRate(s.io_write) : '-'}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-slate-400 shrink-0">启动时间</span>
+                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
+                                    ${online ? formatTime(s.boot_time) : '-'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-2 pt-1 font-mono tabular-nums">
+                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
+                                <div class="text-[10px] text-slate-400">TCP (t)</div>
+                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.tcp_count}</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
+                                <div class="text-[10px] text-slate-400">UDP (u)</div>
+                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.udp_count}</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
+                                <div class="text-[10px] text-slate-400">进程 (p)</div>
+                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.process_count}</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
+                                <div class="text-[10px] text-slate-400">线程 (d)</div>
+                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.thread_count}</div>
+                            </div>
+                        </div>
+
+                        <div class="pt-1 flex items-center justify-between text-[11px] font-mono tabular-nums">
+                            <span class="text-slate-400 font-sans">本月流量</span>
+                            <span class="text-slate-700 dark:text-slate-300 font-medium">
+                                <span class="text-emerald-600 dark:text-emerald-400">↓${formatTraffic(s.month_in)}</span>
+                                <span class="text-sky-600 dark:text-sky-400 ml-1.5">↑${formatTraffic(s.month_out)}</span>
+                                <span class="text-slate-400 ml-2">累计 ↓${formatTraffic(s.network_in)} ↑${formatTraffic(s.network_out)}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 右：三网 24 小时延迟 / 实时吞吐 -->
+                    <div class="lg:col-span-7 bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90 flex flex-col justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <div class="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 text-xs">
+                                <button onclick="event.stopPropagation(); switchChartTab('ping')" class="px-2.5 py-1 rounded-md font-medium transition ${activeChartTab === 'ping' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}">
+                                    三网 24 小时延迟
+                                </button>
+                                <button onclick="event.stopPropagation(); switchChartTab('net')" class="px-2.5 py-1 rounded-md font-medium transition ${activeChartTab === 'net' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}">
+                                    实时吞吐 (RX/TX)
+                                </button>
+                            </div>
+
+                            ${activeChartTab === 'ping' ? `
+                                <div class="flex flex-wrap items-center gap-3 text-[11px] font-mono tabular-nums" title="当前延迟（丢包率）">
+                                    <span class="inline-flex items-center gap-1 text-blue-500">
+                                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                        电信: <strong>${online && s.time_189 > 0 ? s.time_189 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_189)})</span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1 text-amber-500">
+                                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        联通: <strong>${online && s.time_10010 > 0 ? s.time_10010 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_10010)})</span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1 text-emerald-500">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        移动: <strong>${online && s.time_10086 > 0 ? s.time_10086 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_10086)})</span>
+                                    </span>
+                                </div>
+                            ` : `
+                                <div class="flex items-center gap-3 text-[11px] font-mono tabular-nums">
+                                    <span class="inline-flex items-center gap-1 text-emerald-500">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        下行 RX: <strong>${formatBytesRate(online ? s.network_rx : 0, false)}</strong>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1 text-sky-500">
+                                        <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                                        上行 TX: <strong>${formatBytesRate(online ? s.network_tx : 0, false)}</strong>
+                                    </span>
+                                </div>
+                            `}
+                        </div>
+
+                        <div class="relative w-full h-40">
+                            <canvas id="canvas-${esc(s.id)}" class="w-full h-full block"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+        }
+
+        function renderCards(list) {
+            return `
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    ${list.map(s => {
+                        const online = isOnline(s);
+                        const isExpanded = expandedServerId === s.id;
+                        const ramPct = online ? pct(s.memory_used, s.memory_total) : 0;
+                        const swapPct = online ? pct(s.swap_used, s.swap_total) : 0;
+                        const hddPct = pct(s.hdd_used, s.hdd_total);
+
+                        return `
+                            <div onclick="toggleExpandRow('${esc(s.id)}')" class="cursor-pointer rounded-xl border ${isExpanded ? 'border-emerald-500/50 dark:border-emerald-500/50 md:col-span-2 xl:col-span-3' : 'border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'} bg-white dark:bg-[#111827] p-4 transition-all flex flex-col justify-between ${!online ? 'opacity-75' : ''}">
+                                <div>
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            ${renderFlagBadge(s.location)}
+                                            <div class="min-w-0">
+                                                <h3 class="font-semibold text-sm text-slate-900 dark:text-white truncate">${esc(s.name)}</h3>
+                                                <p class="text-[11px] text-slate-400 truncate">${esc(s.regionName)} · ${s.os}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+                                            <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">${esc(s.type)}</span>
+                                            ${online
+                                                ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">${esc(s.uptime)}</span>`
+                                                : `<span class="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">OFFLINE</span>`
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 space-y-2 font-mono tabular-nums text-[11px]">
+                                        <div class="grid grid-cols-12 items-center gap-2">
+                                            <span class="col-span-2 text-slate-400 font-sans">CPU</span>
+                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                <div class="h-full ${getCapsuleColorClass(s.cpu, online)} ss-bar-fill" style="width:${online ? Math.min(100, s.cpu) : 0}%"></div>
+                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? s.cpu + '%' : '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-12 items-center gap-2">
+                                            <span class="col-span-2 text-slate-400 font-sans">内存</span>
+                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                <div class="h-full ${getCapsuleColorClass(ramPct, online)} ss-bar-fill" style="width:${ramPct}%"></div>
+                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? `${ramPct}% (${formatRamCap(s.memory_used, s.memory_total)})` : '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-12 items-center gap-2">
+                                            <span class="col-span-2 text-slate-400 font-sans">Swap</span>
+                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                <div class="h-full bg-indigo-500/80 ss-bar-fill" style="width:${swapPct}%"></div>
+                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? (s.swap_total > 0 ? `${swapPct}% (${s.swap_used.toFixed(0)}/${s.swap_total.toFixed(0)}M)` : '未启用') : '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-12 items-center gap-2">
+                                            <span class="col-span-2 text-slate-400 font-sans">硬盘</span>
+                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                <div class="h-full ${getCapsuleColorClass(hddPct, online)} ss-bar-fill" style="width:${hddPct}%"></div>
+                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${hddPct}% (${formatGB(s.hdd_used)}/${formatGB(s.hdd_total)}G)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] font-mono tabular-nums">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-emerald-600 dark:text-emerald-400">↓${online ? formatBytesRate(s.network_rx, true) : '0K'}</span>
+                                        <span class="text-sky-600 dark:text-sky-400">↑${online ? formatBytesRate(s.network_tx, true) : '0K'}</span>
+                                    </div>
+                                    <div class="text-slate-400">
+                                        t/u/p/d: <span class="text-slate-700 dark:text-slate-300">${s.tcp_count}/${s.udp_count}/${s.process_count}/${s.thread_count}</span>
+                                    </div>
+                                    <div>
+                                        ${online
+                                            ? `<span class="${getPingClass(s.time_189)}">${pingText(s.time_189)}</span>/<span class="${getPingClass(s.time_10010)}">${pingText(s.time_10010)}</span>/<span class="${getPingClass(s.time_10086)}">${pingText(s.time_10086)}</span>ms`
+                                            : `<span class="text-rose-500">离线</span>`
+                                        }
+                                    </div>
+                                </div>
+
+                                ${isExpanded ? `
+                                    <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 cursor-default" onclick="event.stopPropagation()">
+                                        ${renderExpandedDetailPanel(s)}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        // 三网历史每行 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1
+        function pingSeries(serverId) {
+            const d = p24.data;
+            if (!d) return null;
+            const ct = Array(d.slots).fill(null), cu = Array(d.slots).fill(null), cm = Array(d.slots).fill(null);
+            (d.nodes[serverId] || []).forEach(r => {
+                const i = Math.round((r[0] - d.start) / d.step);
+                if (i < 0 || i >= d.slots) return;
+                cu[i] = r[2] >= 0 ? r[2] : null;
+                ct[i] = r[4] >= 0 ? r[4] : null;
+                cm[i] = r[6] >= 0 ? r[6] : null;
+            });
+            return { ct, cu, cm, start: d.start, end: d.start + (d.slots - 1) * d.step };
+        }
+
+        function drawExpandedCanvas(serverId) {
+            const canvas = document.getElementById(`canvas-${serverId}`);
+            if (!canvas) return;
+
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(260, rect.width);
+            const height = Math.max(130, rect.height);
+
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, width, height);
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(100, 116, 139, 0.14)';
+            const textColor = isDark ? '#64748b' : '#94a3b8';
+
+            const padL = 40, padR = 10, padT = 12, padB = 20;
+            const plotW = width - padL - padR;
+            const plotH = height - padT - padB;
+
+            let datasets, unit, labels, floor;
+            if (activeChartTab === 'ping') {
+                const p = pingSeries(serverId);
+                datasets = p ? [
+                    { data: p.ct, stroke: '#3b82f6', fill: null },
+                    { data: p.cu, stroke: '#f59e0b', fill: null },
+                    { data: p.cm, stroke: '#10b981', fill: null }
+                ] : [];
+                unit = 'ms';
+                floor = 60;
+                labels = p ? [fmtHM(p.start), fmtHM((p.start + p.end) / 2), fmtHM(p.end)] : ['', '', ''];
+            } else {
+                const h = netHistory[serverId] || { rx: [], tx: [] };
+                const pad = arr => Array(Math.max(0, NET_POINTS - arr.length)).fill(null).concat(arr);
+                datasets = [
+                    { data: pad(h.rx), stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.16)' },
+                    { data: pad(h.tx), stroke: '#0ea5e9', fill: 'rgba(14, 165, 233, 0.12)' }
+                ];
+                unit = 'MB/s';
+                floor = 1;
+                labels = [`-${(NET_POINTS - 1) * REFRESH_MS / 1000}s`, '', '现在'];
+            }
+
+            const values = datasets.flatMap(d => d.data).filter(v => v != null);
+            const maxVal = Math.max(...values, floor) * 1.18;
+
+            ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+            ctx.fillStyle = textColor;
+            ctx.strokeStyle = gridColor;
+            ctx.lineWidth = 1;
+
+            [0, 0.5, 1].forEach(ratio => {
+                const y = padT + plotH * ratio;
+                const v = maxVal * (1 - ratio);
+                ctx.beginPath();
+                ctx.setLineDash([3, 3]);
+                ctx.moveTo(padL, y);
+                ctx.lineTo(width - padR, y);
+                ctx.stroke();
+                ctx.fillText(maxVal < 10 ? v.toFixed(1) : `${Math.round(v)}`, 2, y + 3);
+            });
+            ctx.setLineDash([]);
+            ctx.fillText(unit, 2, height - 4);
+
+            ctx.textAlign = 'left';
+            ctx.fillText(labels[0], padL, height - 4);
+            ctx.textAlign = 'center';
+            ctx.fillText(labels[1], padL + plotW / 2, height - 4);
+            ctx.textAlign = 'right';
+            ctx.fillText(labels[2], width - padR, height - 4);
+            ctx.textAlign = 'left';
+
+            if (!values.length) {
+                ctx.textAlign = 'center';
+                ctx.fillText(activeChartTab === 'ping' ? '暂无三网历史数据' : '等待数据…', padL + plotW / 2, padT + plotH / 2);
+                ctx.textAlign = 'left';
+                return;
+            }
+
+            datasets.forEach(series => {
+                const n = series.data.length;
+                const stepX = plotW / Math.max(1, n - 1);
+                // 无数据的格子断开，分段绘制
+                const segments = [];
+                let seg = null;
+                series.data.forEach((v, i) => {
+                    if (v == null) { seg = null; return; }
+                    if (!seg) segments.push(seg = []);
+                    seg.push({ x: padL + i * stepX, y: padT + plotH - (Math.min(maxVal, v) / maxVal) * plotH });
+                });
+
+                segments.forEach(pts => {
+                    if (series.fill) {
+                        ctx.beginPath();
+                        ctx.moveTo(pts[0].x, padT + plotH);
+                        pts.forEach(p => ctx.lineTo(p.x, p.y));
+                        ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
+                        ctx.closePath();
+                        ctx.fillStyle = series.fill;
+                        ctx.fill();
+                    }
+                    ctx.beginPath();
+                    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+                    if (pts.length === 1) ctx.lineTo(pts[0].x + 0.01, pts[0].y);
+                    ctx.strokeStyle = series.stroke;
+                    ctx.lineWidth = 1.8;
+                    ctx.lineJoin = 'round';
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                });
+            });
+        }
+
+        async function loadPing24h() {
+            if (Date.now() - p24.at < 60000) return;
+            p24.at = Date.now();
+            try {
+                const res = await fetch('json/ping24h.json', { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                p24.data = await res.json();
+                if (expandedServerId && activeChartTab === 'ping') drawExpandedCanvas(expandedServerId);
+            } catch (e) {
+                p24.at = 0;
+            }
+        }
+
+        async function tickUpdate() {
+            // 页面不可见时不刷新，节省流量
+            if (document.hidden || fetching) return;
+            fetching = true;
+            loadPing24h();
+            try {
+                const res = await fetch('json/stats.json', { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                // 主控更新后版本号变化，自动刷新页面加载新前端
+                if (data.version) {
+                    if (!pageVersion) pageVersion = data.version;
+                    else if (pageVersion !== data.version) setTimeout(() => location.reload(), 1000);
+                    document.getElementById('footerVersion').textContent = data.version;
+                }
+                if (data.title) {
+                    document.title = data.title;
+                    document.getElementById('brandTitle').textContent = data.title;
+                }
+                ingestStats(Array.isArray(data.servers) ? data.servers : []);
+                loaded = true;
+                document.getElementById('footerTimestamp').textContent = formatTime(Number(data.updated)).slice(11);
+                setSyncState(syncRunning ? 'live' : 'paused');
+            } catch (e) {
+                if (syncRunning) setSyncState('error');
+            } finally {
+                fetching = false;
+            }
+
+            updateHeaderSummary();
+            renderGroupPills();
+            renderMainView();
+        }
+
+        function setSyncState(state) {
+            const dot = document.getElementById('syncDot');
+            const txt = document.getElementById('syncText');
+            const btn = document.getElementById('syncToggleBtn');
+            const base = 'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums border transition ';
+            if (state === 'live') {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
+                txt.textContent = `${REFRESH_MS / 1000}s 实时同步`;
+                btn.className = base + 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15';
+            } else if (state === 'paused') {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
+                txt.textContent = '已暂停刷新';
+                btn.className = base + 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15';
+            } else {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 live-dot';
+                txt.textContent = '连接失败，重试中';
+                btn.className = base + 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/15';
+            }
+        }
+
+        function toggleExpandRow(serverId) {
+            expandedServerId = (expandedServerId === serverId) ? null : serverId;
+            renderMainView();
+        }
+
+        function switchChartTab(tab) {
+            activeChartTab = tab;
+            renderMainView();
+        }
+
+        function switchView(view) {
+            currentView = view;
+            localStorage.setItem('ss_view', view);
+            const activeCls = 'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white';
+            const inactiveCls = 'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200';
+            document.getElementById('btnViewTable').className = view === 'table' ? activeCls : inactiveCls;
+            document.getElementById('btnViewCards').className = view === 'cards' ? activeCls : inactiveCls;
+            renderMainView();
+        }
+
+        function selectGroup(group) {
+            currentGroup = group;
+            renderGroupPills();
+            renderMainView();
+        }
+
+        function handleSearch(val) {
+            searchQuery = val;
+            renderMainView();
+        }
+
+        function resetFilterState() {
+            currentGroup = 'ALL';
+            searchQuery = '';
+            document.getElementById('searchInput').value = '';
+            renderGroupPills();
+            renderMainView();
+        }
+
+        function toggleBarTextMode() {
+            barShowCapacity = !barShowCapacity;
+            localStorage.setItem('ss_cap', barShowCapacity ? '1' : '0');
+            document.getElementById('barTextModeLabel').textContent = barShowCapacity ? 'GB' : '%';
+            renderMainView();
+        }
+
+        function toggleSync() {
+            syncRunning = !syncRunning;
+            clearInterval(syncTimer);
+            if (syncRunning) {
+                setSyncState('live');
+                syncTimer = setInterval(tickUpdate, REFRESH_MS);
+                tickUpdate();
+            } else {
+                setSyncState('paused');
+            }
+        }
+
+        function toggleTheme() {
+            const dark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('ss_theme', dark ? 'dark' : 'light');
+            if (expandedServerId) {
+                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if (expandedServerId) {
+                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const search = document.getElementById('searchInput');
+            if (e.key === '/' && document.activeElement !== search) {
+                e.preventDefault();
+                search.focus();
+            } else if (e.key === 'Escape') {
+                if (document.activeElement === search) search.blur();
+                else if (expandedServerId) toggleExpandRow(expandedServerId);
+            }
+        });
+
+        // 切回标签页时立即刷新
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && syncRunning) tickUpdate();
+        });
+
+        switchView(currentView);
+        document.getElementById('barTextModeLabel').textContent = barShowCapacity ? 'GB' : '%';
+        renderMainView();
+        tickUpdate();
+        syncTimer = setInterval(tickUpdate, REFRESH_MS);
+    </script>
+</body>
 </html>
