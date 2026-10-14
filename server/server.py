@@ -454,6 +454,7 @@ class Store:
                     "uptime": "%d 天" % days if days > 0 else
                               "%02d:%02d:%02d" % (up // 3600, up // 60 % 60, up % 60),
                     "boot_time": boot,           # Unix 时间戳，前端按浏览器时区显示
+                    "last_active": int(n["t"]),  # 最后上报时间
                     "load_1": d[1], "load_5": d[1], "load_15": d[1],
                     "ping_10010": d[19], "ping_189": d[21], "ping_10086": d[23],
                     "time_10010": max(d[18], 0), "time_189": max(d[20], 0), "time_10086": max(d[22], 0),
@@ -619,13 +620,15 @@ class WebHandler(BaseHTTPRequestHandler):
             return self.send(200, body, gz=gz)
         path = "/index.html" if url.path == "/" else url.path
         full = os.path.realpath(os.path.join(WEB_DIR, path.lstrip("/")))
+        if not os.path.splitext(full)[1] and os.path.isfile(full + ".html"):
+            full += ".html"   # /network -> network.html
         if not full.startswith(os.path.realpath(WEB_DIR) + os.sep) or not os.path.isfile(full):
             return self.send(404, b"not found", "text/plain")
         # 静态文件每次向服务端确认是否变化（未变化返回 304，几乎不耗流量），更新后立即生效
         st = os.stat(full)
         etag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
-        is_index = full.endswith("index.html")
-        if is_index:
+        is_page = full.endswith(".html")
+        if is_page:
             etag = etag[:-1] + "-" + VERSION[:7] + '"'
         if self.headers.get("If-None-Match") == etag:
             self.send_response(304)
@@ -635,10 +638,10 @@ class WebHandler(BaseHTTPRequestHandler):
             return
         with open(full, "rb") as f:
             data = f.read()
-        if is_index:
-            # 给脚本和样式加版本号，更新后浏览器不会继续使用缓存的旧文件
+        if is_page:
+            # 给本地脚本和样式加版本号，更新后浏览器不会继续使用缓存的旧文件（CDN 地址不变）
             v = ("?v=" + VERSION[:7]).encode()
-            data = data.replace(b'.js"', b'.js' + v + b'"').replace(b'.css"', b'.css' + v + b'"')
+            data = re.sub(rb'((?:src|href)="(?!https?:|//)[^"?]+\.(?:js|css))"', lambda m: m.group(1) + v + b'"', data)
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype.endswith("javascript"):
             ctype += "; charset=utf-8"

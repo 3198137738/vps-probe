@@ -1,8 +1,8 @@
 # 云监控探针
 
-轻量级 VPS 探针，前端为单页 Tailwind 界面（表格 / 卡片两种视图，深浅色主题）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
+轻量级 VPS 探针，前端采用哪吒监控 v0 默认主题。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
 
-监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点可展开详情（处理器/系统、内存/Swap、硬盘/读写、TCP/UDP/进程/线程、本月流量、三网 24 小时延迟曲线与实时吞吐曲线）。
+监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点名右侧的信息图标可查看详情（系统、CPU、硬盘、内存、交换、流量、负载、进程数、连接数、启动时间与三网 24 小时延迟图），「网络」页可查看各节点三网延迟曲线。
 
 **三网丢包图**：表格最后一列显示联通 / 电信 / 移动的实时丢包率，鼠标悬停可查看 24 小时丢包图（每 20 分钟一格，颜色表示丢包率、高度表示延迟）。数据由节点到三网探测目标的 TCP 握手测得（出站方向），主控自动记录，无需任何设置；历史保存在 `/opt/probe-server/history.json`。
 
@@ -139,13 +139,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 - 国家/协议栈识别每 6 小时一次
 - 网页与接口 gzip 压缩，静态资源协商缓存（未变化返回 304），标签页隐藏时自动停止刷新
 
-## 修改前端
+## 前端
 
-`server/web/css/app.css` 由 Tailwind v3 根据 `index.html` 中用到的类名预编译生成（页面不依赖 CDN）。修改 `index.html` 新增了类名后需重新生成：
+前端为[哪吒监控](https://github.com/nezhahq/nezha) v0（`v0-final` 分支）默认主题，页面结构与样式原样保留（Apache-2.0，许可证见 `server/web/static/LICENSE-nezha`），Semantic UI、Vue、ECharts 等依赖与原版一样从 unpkg 加载。
 
-```bash
-SRC=server/web/index.html npx tailwindcss@3 -c server/tailwind.config.js -o server/web/css/app.css --minify
-```
+`server/web/static/nezha-adapter.js` 负责把 `/json/stats.json`、`/json/ping24h.json` 转换为哪吒的数据格式，并以每 2 秒拉取一次代替原版的 WebSocket。节点弹窗中的延迟图与「网络」页使用三网 24 小时历史。本项目没有服务监控与后台，菜单中不显示「服务」「主题」「登录」。
 
 ## 目录结构
 
@@ -153,7 +151,7 @@ SRC=server/web/index.html npx tailwindcss@3 -c server/tailwind.config.js -o serv
 agent/agent.py        Linux 客户端
 agent/agent.ps1       Windows 客户端（PowerShell）
 server/server.py      服务端（TCP 上报 + HTTP 网页）
-server/web/           前端页面（Tailwind 预编译为 css/app.css，数据接口 /json/stats.json 与 /json/ping24h.json）
+server/web/           前端页面（哪吒 v0 默认主题，数据接口 /json/stats.json 与 /json/ping24h.json）
 probe.sh              主控管理脚本（安装 / 更新 / 节点管理 / 设置 / 卸载）
 install.sh            Linux 客户端安装 / 卸载
 install.ps1           Windows 客户端安装 / 卸载

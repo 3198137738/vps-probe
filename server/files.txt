@@ -9,4 +9,15 @@ install.sh
 install.ps1
 server/web/index.html
 server/web/favicon.ico
-server/web/css/app.css
+server/web/network.html
+server/web/static/nezha-adapter.js
+server/web/static/logo.svg
+server/web/static/darkmode.css
+server/web/static/semantic-ui-alerts.min.css
+server/web/static/semantic-ui-alerts.min.js
+server/web/static/manifest-zh-CN.json
+server/web/static/manifest-192x192.png
+server/web/static/manifest-512x512.png
+server/web/static/theme-default/css/main.css
+server/web/static/theme-default/js/mixin.js
+server/web/static/LICENSE-nezha

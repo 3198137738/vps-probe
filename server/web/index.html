@@ -1,1634 +1,702 @@
+
+
 <!DOCTYPE html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>云监控</title>
-    <link rel="icon" href="favicon.ico">
-    <link rel="stylesheet" href="css/app.css">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta content="telephone=no" name="format-detection">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="/static/manifest-zh-CN.json?v20240905" />
+    <link rel="apple-touch-startup-image" href="/static/logo.svg" />
+    <link rel="shortcut icon" type="image/png" href="/static/logo.svg">
+    <link rel="stylesheet" href="https://unpkg.com/semantic-ui@2.4.0/dist/semantic.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/font-logos@0.17.0/assets/font-logos.css">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/flag-icons@7.2.3/css/flag-icons.min.css">
+    <link rel="stylesheet" type="text/css" href="/static/semantic-ui-alerts.min.css">
+    <link rel="stylesheet" type="text/css" href="/static/theme-default/css/main.css?v20240816">
+    <link rel="stylesheet" type="text/css" href="/static/darkmode.css?v20240816">
+    <script src="https://unpkg.com/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/semantic-ui@2.4.0/dist/semantic.min.js"></script>
+    <script src="https://unpkg.com/vue@2.6.14/dist/vue.min.js"></script>
+    <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="/static/semantic-ui-alerts.min.js"></script>
+    <script src="/static/theme-default/js/mixin.js?v20240911"></script>
+    <script src="/static/nezha-adapter.js"></script>
     <script>
-        // 主题在渲染前确定，避免浅色用户看到深色闪烁
-        if (localStorage.getItem('ss_theme') === 'light') document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('nz-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     </script>
-    <style>
-        :root {
-            --bg-canvas: #F4F6FA;
-            --bg-surface: #FFFFFF;
-            --bg-surface-hover: #F1F5F9;
-            --bg-drawer: #F8FAFC;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-            --border-hairline: #E2E8F0;
-            --text-primary: #0F172A;
-            --text-secondary: #475569;
-            --text-muted: #94A3B8;
-            --pill-track: #F1F5F9;
-            --pill-thumb: #FFFFFF;
-            --capsule-track: #E2E8F0;
-        }
-        html.dark {
-            --bg-canvas: #090A0F;
-            --bg-surface: #11131A;
-            --bg-surface-hover: #171A24;
-            --bg-drawer: #161922;
-            --bg-glass: rgba(17, 19, 26, 0.82);
-            --border-hairline: rgba(255, 255, 255, 0.07);
-            --text-primary: #F8FAFC;
-            --text-secondary: #94A3B8;
-            --text-muted: #64748B;
-            --pill-track: #0D0F16;
-            --pill-thumb: #1E2230;
-            --capsule-track: rgba(255, 255, 255, 0.07);
-        }
-        * {
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            box-sizing: border-box;
-        }
-        body {
-            background-color: var(--bg-canvas);
-            color: var(--text-primary);
-            transition: background-color 250ms ease, color 250ms ease;
-        }
-        .surface-card {
-            background-color: var(--bg-surface);
-            border: 1px solid var(--border-hairline);
-            transition: background-color 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
-        }
-        .glass-header {
-            background-color: var(--bg-glass);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-hairline);
-            transition: background-color 250ms ease, border-color 250ms ease;
-        }
-        .tabular-nums {
-            font-variant-numeric: tabular-nums;
-            font-feature-settings: "tnum" 1;
-        }
-        /* 0fr -> 1fr Hardware-Accelerated Accordion Drawer */
-        .drawer-grid {
-            display: grid;
-            grid-template-rows: 0fr;
-            opacity: 0;
-            transition: grid-template-rows 380ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms ease;
-            will-change: grid-template-rows, opacity;
-        }
-        .drawer-grid.is-open {
-            grid-template-rows: 1fr;
-            opacity: 1;
-        }
-        .drawer-inner {
-            overflow: hidden;
-            min-height: 0;
-        }
-        /* Sliding Pill Segmented Control */
-        .seg-track {
-            position: relative;
-            background-color: var(--pill-track);
-            border: 1px solid var(--border-hairline);
-            border-radius: 0.5rem;
-            padding: 2px;
-            display: inline-flex;
-            align-items: center;
-        }
-        .seg-thumb {
-            position: absolute;
-            top: 2px;
-            bottom: 2px;
-            left: 0;
-            background-color: var(--pill-thumb);
-            border-radius: 0.375rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-            transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms cubic-bezier(0.22, 1, 0.36, 1), background-color 250ms ease;
-            will-change: transform, width;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .seg-btn {
-            position: relative;
-            z-index: 1;
-            transition: color 180ms ease;
-        }
-        /* 18px Classic ServerStatus Capsule Progress Bar */
-        .ss-capsule {
-            position: relative;
-            height: 18px;
-            border-radius: 5px;
-            background-color: var(--capsule-track);
-            overflow: hidden;
-            user-select: none;
-        }
-        .ss-capsule-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: background-color 300ms ease;
-            will-change: width;
-        }
-        .ss-capsule-text {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 600;
-            line-height: 1;
-            letter-spacing: -0.01em;
-            color: #FFFFFF;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
-            pointer-events: none;
-        }
-        html:not(.dark) .ss-capsule-text {
-            color: #0F172A;
-            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
-        }
-        /* Live Beacon Animation */
-        @keyframes beaconPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.85); opacity: 0; }
-        }
-        .beacon-ring {
-            animation: beaconPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-        /* Sortable Header Hover */
-        th.sortable {
-            cursor: pointer;
-            user-select: none;
-            transition: color 150ms ease, background-color 150ms ease;
-        }
-        th.sortable:hover {
-            color: var(--text-primary);
-            background-color: rgba(148, 163, 184, 0.08);
-        }
-        /* Custom Slim Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
-    </style>
 </head>
-<body class="font-sans min-h-screen flex flex-col selection:bg-emerald-500/20 selection:text-emerald-400">
 
-    <!-- Top Floating Glass Header -->
-    <header class="sticky top-0 z-30 glass-header">
-        <div class="max-w-[1520px] mx-auto px-3 sm:px-5 h-14 flex items-center justify-between gap-3">
-            
-            <!-- Left: Brand Logo + Live Pulsing Beacon + Data Mode Badge -->
-            <div class="flex items-center gap-2.5 shrink-0">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-1.5">
-                            <span id="brandTitle" class="font-bold tracking-tight text-sm sm:text-base">云监控</span>
-                        </div>
-                    </div>
-                </div>
+<body>
+    
 
-                <!-- Pause / Resume Stream Button -->
-                <button id="streamToggleBtn" onclick="toggleStreamPause()" title="点击暂停或恢复实时数据流" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tabular-nums border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer">
-                    <span class="relative flex h-2 w-2">
-                        <span id="streamBeaconRing" class="beacon-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span id="streamBeaconDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span id="streamStatusLabel">连接中…</span>
-                </button>
-            </div>
 
-            <!-- Center: 4-Pill Global Telemetry Strip -->
-            <div class="hidden xl:flex items-center gap-2 text-xs font-mono tabular-nums">
-                <!-- Pill 1: Online Ratio + IPv6 Count -->
-                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
-                    <span class="text-[11px] font-sans text-slate-400">在线节点</span>
-                    <span id="sumOnlineCount" class="font-semibold text-emerald-500">- / -</span>
-                    <span class="text-slate-300 dark:text-slate-700">|</span>
-                    <span id="sumIpv6Count" class="text-[11px] text-sky-500">0 IPv6</span>
-                </div>
-                <!-- Pill 2: Global Live RX -->
-                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
-                    <span class="text-[11px] font-sans text-slate-400">∑ 实时下行</span>
-                    <span class="text-sky-500 font-semibold">↓ <span id="sumTotalRx">0.0 MB/s</span></span>
-                </div>
-                <!-- Pill 3: Global Live TX -->
-                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
-                    <span class="text-[11px] font-sans text-slate-400">∑ 实时上行</span>
-                    <span class="text-emerald-500 font-semibold">↑ <span id="sumTotalTx">0.0 MB/s</span></span>
-                </div>
-                <!-- Pill 4: Monthly Total Traffic + Timestamp -->
-                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
-                    <span class="text-[11px] font-sans text-slate-400">本月总流量</span>
-                    <span id="sumTotalTraffic" class="font-semibold">0 MiB</span>
-                    <span class="text-slate-300 dark:text-slate-700">·</span>
-                    <span id="sumUpdatedClock" class="text-[11px] text-slate-400">--:--:--</span>
+<div id="app">
+<div class="ui large top fixed menu nb-menu" style="z-index:9999999;">
+    <div class="ui container">
+        <a class="item" href="/">
+            <img src="/static/logo.svg?v20210804">
+        </a>
+        <a class='item' href="/"><i class="home icon"></i>首页</a>
+        <template v-if="isMobile"> 
+            <div class="item ui dropdown" :class="{ simple: !isMobile }">
+                <div class="text"><i class="bi bi-gear-wide-connected icon" style="margin-right:3px;"></i>功能<i class="dropdown icon" style="margin-right:0px;"></i></div>
+                <div class="menu">
+                    <a href="/network" class="item"><i class="bi bi-hdd-network icon"></i>网络</a>
                 </div>
             </div>
+        </template>
+        <template v-else>
+            <a href="/network" class="item"><i class="bi bi-hdd-network icon"></i>网络</a>
+        </template>
+    </div>
+</div>
 
-            <!-- Right: Compact Action Controls -->
-            <div class="flex items-center gap-1.5 sm:gap-2">
-                <!-- Progress Bar Label Segmented Control (% vs GiB) -->
-                <div id="segBarMode" class="seg-track hidden md:inline-flex" title="切换进度条内部文字：百分比 (%) 或 精确容量 (GiB)">
-                    <div class="seg-thumb" id="thumbBarMode"></div>
-                    <button type="button" data-val="pct" onclick="setBarLabelMode('pct')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">% 百分比</button>
-                    <button type="button" data-val="cap" onclick="setBarLabelMode('cap')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">GiB 容量</button>
+<div class="nb-container">
+    <div class="ui container">
+        <template v-if="groups">
+            <div class="ui styled fluid accordion" v-for="group in groups">
+                <div class="active title">
+                    <i class="dropdown icon"></i>
+                    @#(group.Tag!==''?group.Tag:'默认')#@
                 </div>
-
-                <!-- Speed Unit Segmented Control (B/s vs bps) -->
-                <div id="segSpeedUnit" class="seg-track hidden sm:inline-flex" title="切换实时速率单位：字节 (MB/s) 或 比特 (Mbps)">
-                    <div class="seg-thumb" id="thumbSpeedUnit"></div>
-                    <button type="button" data-val="byte" onclick="setSpeedUnit('byte')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">B/s</button>
-                    <button type="button" data-val="bit" onclick="setSpeedUnit('bit')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">bps</button>
-                </div>
-
-                <!-- View Switcher Segmented Control (Table vs Hotaru Cards) -->
-                <div id="segViewMode" class="seg-track">
-                    <div class="seg-thumb" id="thumbViewMode"></div>
-                    <button type="button" data-val="table" onclick="setViewMode('table')" class="seg-btn flex items-center gap-1 px-2.5 py-1 text-xs font-medium">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                        <span class="hidden sm:inline">表格</span>
-                    </button>
-                    <button type="button" data-val="cards" onclick="setViewMode('cards')" class="seg-btn flex items-center gap-1 px-2.5 py-1 text-xs font-medium">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-                        <span class="hidden sm:inline">Hotaru</span>
-                    </button>
-                </div>
-
-                <!-- Theme Polarity Toggle -->
-                <button onclick="toggleTheme()" class="p-1.5 rounded-lg surface-card hover:border-slate-400 dark:hover:border-slate-600 transition cursor-pointer" title="切换深色 / 浅色模式">
-                    <svg class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                    <svg class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-[1520px] w-full mx-auto px-3 sm:px-5 py-4 space-y-3.5">
-
-        <!-- Control Toolbar: Sliding Region Tabs + Instant Search + Mobile Telemetry -->
-        <div class="flex flex-wrap items-center justify-between gap-2.5">
-            <!-- Region Filter Segmented Control with Sliding Pill -->
-            <div class="overflow-x-auto max-w-full pb-0.5 sm:pb-0">
-                <div id="segRegion" class="seg-track">
-                    <div class="seg-thumb" id="thumbRegion"></div>
-                    <button type="button" data-val="ALL" onclick="setRegionFilter('ALL')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap">全部 <span id="cnt-ALL" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                    <button type="button" data-val="亚太" onclick="setRegionFilter('亚太')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">亚太 <span id="cnt-亚太" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                    <button type="button" data-val="北美" onclick="setRegionFilter('北美')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">北美 <span id="cnt-北美" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                    <button type="button" data-val="欧洲" onclick="setRegionFilter('欧洲')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">欧洲 <span id="cnt-欧洲" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                    <button type="button" data-val="其他" onclick="setRegionFilter('其他')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">其他 <span id="cnt-其他" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                    <button type="button" data-val="ALERT" onclick="setRegionFilter('ALERT')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap text-amber-500">异常/告警 <span id="cnt-ALERT" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
-                </div>
-            </div>
-
-            <!-- Right Search Input & Mobile Summary Strip -->
-            <div class="flex items-center gap-2.5 ml-auto">
-                <div class="flex xl:hidden items-center gap-2 text-[11px] font-mono tabular-nums px-2.5 py-1 rounded-lg surface-card">
-                    <span id="mobOnline" class="text-emerald-500 font-semibold">-/-</span>
-                    <span class="text-sky-500">↓<span id="mobRx">0.0M</span></span>
-                    <span class="text-emerald-500">↑<span id="mobTx">0.0M</span></span>
-                </div>
-
-                <div class="relative w-48 sm:w-64">
-                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input
-                        id="searchInput"
-                        type="text"
-                        oninput="handleSearchInput(this.value)"
-                        placeholder="搜索节点 / 地区 / 虚拟化 / 系统..."
-                        class="w-full pl-8 pr-12 py-1.5 text-xs rounded-lg surface-card focus:outline-none focus:border-emerald-500/60 placeholder-slate-400 dark:placeholder-slate-500"
-                    />
-                    <kbd id="searchKbdHint" class=" absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-400 pointer-events-none">/</kbd>
-                </div>
-            </div>
-        </div>
-
-        <!-- View 1: 12-Column Classic ServerStatus High-Density Table -->
-        <div id="tableViewWrapper" class="surface-card rounded-xl shadow-xs overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-slate-200/80 dark:border-white/[0.07] bg-slate-100/60 dark:bg-white/[0.02] text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider whitespace-nowrap">
-                            <th class="py-2.5 pl-3.5 pr-2 w-[72px]">状态</th>
-                            <th class="py-2.5 px-2.5 min-w-[165px]">节点名称</th>
-                            <th class="py-2.5 px-2 w-[78px]">虚拟化</th>
-                            <th class="py-2.5 px-2 w-[60px]">位置</th>
-                            <th onclick="cycleSort('uptimeSec')" class="sortable py-2.5 px-2 w-[82px] text-right" title="点击按在线时间排序">
-                                <span class="inline-flex items-center justify-end gap-1">在线时间<span id="sort-uptimeSec" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('load1')" class="sortable py-2.5 px-2 w-[68px] text-right" title="点击按系统 1 分钟负载排序">
-                                <span class="inline-flex items-center justify-end gap-1">负载<span id="sort-load1" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('speed')" class="sortable py-2.5 px-2.5 w-[138px] text-right" title="点击按实时总网速排序">
-                                <span class="inline-flex items-center justify-end gap-1">实时网速 ↓/↑<span id="sort-speed" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('traffic')" class="sortable py-2.5 px-2.5 w-[124px] text-right hidden lg:table-cell" title="点击按本月流量排序（悬停数值查看累计）">
-                                <span class="inline-flex items-center justify-end gap-1">月流量 ↓/↑<span id="sort-traffic" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('ping')" class="sortable py-2.5 px-2.5 w-[128px] text-center hidden xl:table-cell" title="点击按三网平均延迟排序 (电信 CT / 联通 CU / 移动 CM)">
-                                <span class="inline-flex items-center justify-center gap-1">三网 CT/CU/CM<span id="sort-ping" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('cpu')" class="sortable py-2.5 px-2 w-[108px] text-center" title="点击按 CPU 占用率排序">
-                                <span class="inline-flex items-center justify-center gap-1">CPU<span id="sort-cpu" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('mem')" class="sortable py-2.5 px-2 w-[122px] text-center" title="点击按内存占用率排序 (底部 2px 细条为 Swap)">
-                                <span class="inline-flex items-center justify-center gap-1">内存 <span class="text-[9px] font-normal opacity-60">+Swap</span><span id="sort-mem" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                            <th onclick="cycleSort('hdd')" class="sortable py-2.5 pl-2 pr-3.5 w-[114px] text-center hidden md:table-cell" title="点击按硬盘占用率排序">
-                                <span class="inline-flex items-center justify-center gap-1">硬盘<span id="sort-hdd" class="text-[10px] opacity-40">↕</span></span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="serverTableBody" class="divide-y divide-slate-200/60 dark:divide-white/[0.05] text-xs font-mono tabular-nums">
-                        <!-- Keyed Incremental DOM rows mounted ONCE here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- View 2: Hotaru Card Grid View -->
-        <div id="cardViewWrapper" class="hidden grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 items-start">
-            <!-- Keyed Incremental Hotaru cards mounted ONCE here -->
-        </div>
-
-        <!-- Empty Filter State -->
-        <div id="emptyFilterState" class="hidden surface-card rounded-xl p-10 text-center space-y-2.5">
-            <p id="emptyFilterText" class="text-xs text-slate-400">正在加载节点数据…</p>
-            <button id="emptyFilterBtn" onclick="resetAllFilters()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition cursor-pointer">重置所有筛选条件</button>
-        </div>
-
-    </main>
-
-    <!-- Minimalist Footer -->
-    <footer class="mt-auto border-t border-slate-200/70 dark:border-white/[0.06] py-3.5">
-        <div class="max-w-[1520px] mx-auto px-3 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono text-slate-400">
-            <div class="flex items-center gap-2">
-                <span>版本 <span id="footerVersion" class="text-slate-600 dark:text-slate-300">-</span></span>
-            </div>
-            <div class="flex items-center gap-3 font-sans">
-                <span>点击表头可升降序排列 · 点击任意节点展开 <code class="font-mono text-emerald-500">t/u/p/d</code> 与三网 24 小时延迟曲线</span>
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        /* ==========================================================================
-           1. 常量与状态
-           ========================================================================== */
-        const POLL_MS = 3000;           // 拉取 json/stats.json 的间隔，与客户端默认上报间隔一致
-        const NET_POINTS = 40;          // 实时吞吐曲线保留最近 40 次（约 2 分钟）
-        const REGION_GROUPS = {
-            '亚太': ['HK', 'MO', 'TW', 'CN', 'JP', 'KR', 'SG', 'MY', 'TH', 'VN', 'PH', 'ID', 'IN', 'AU', 'NZ', 'KH', 'BD', 'PK', 'MN'],
-            '北美': ['US', 'CA', 'MX'],
-            '欧洲': ['DE', 'GB', 'NL', 'FR', 'RU', 'FI', 'SE', 'CH', 'IT', 'ES', 'PL', 'NO', 'DK', 'IE', 'AT', 'BE', 'CZ', 'RO', 'BG', 'UA', 'LU', 'PT', 'HU', 'LT', 'LV', 'EE', 'IS', 'MD', 'RS', 'GR']
-        };
-
-        const domRefs = new Map();      // id -> 缓存的 DOM 引用
-        const nodeStates = new Map();   // id -> { raw, current（插值中）, target, history }
-        let serverOrder = [];           // 主控返回的节点顺序
-
-        const prefs = {
-            theme: localStorage.getItem('ss_theme') || 'dark',
-            viewMode: localStorage.getItem('ss_viewMode') === 'cards' ? 'cards' : 'table',
-            barMode: localStorage.getItem('ss_barMode') === 'cap' ? 'cap' : 'pct',
-            speedUnit: localStorage.getItem('ss_speedUnit') === 'bit' ? 'bit' : 'byte'
-        };
-
-        let regionFilter = 'ALL';
-        let searchQuery = '';
-        let sortField = null;           // null | 'uptimeSec' | 'load1' | 'speed' | 'traffic' | 'ping' | 'cpu' | 'mem' | 'hdd'
-        let sortDir = 'desc';
-        let expandedId = null;
-        let chartTab = 'ping';          // 'ping' 三网 24 小时延迟 | 'net' 实时吞吐
-        let isStreamPaused = false;
-        let pollTimer = null;
-        let fetching = false;
-        let loaded = false;
-        let pageVersion = '';
-        let lastFrameTime = performance.now();
-        let canvasHoverX = null;
-
-        const p24 = { at: 0, data: null };  // json/ping24h.json，每分钟拉取一次
-
-        const globalPhysics = {
-            curRx: 0, tgtRx: 0,
-            curTx: 0, tgtTx: 0,
-            curTraffic: 0, tgtTraffic: 0
-        };
-
-        /* ==========================================================================
-           2. 格式化与工具函数
-           ========================================================================== */
-        let regionDisplay = null;
-        try { regionDisplay = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); } catch (e) {}
-
-        function regionName(cc) {
-            if (!/^[A-Z]{2}$/.test(cc)) return '未知';
-            try { return regionDisplay ? regionDisplay.of(cc) : cc; } catch (e) { return cc; }
-        }
-
-        function regionGroupOf(cc) {
-            for (const g in REGION_GROUPS) if (REGION_GROUPS[g].includes(cc)) return g;
-            return '其他';
-        }
-
-        function esc(v) {
-            return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        }
-
-        // cpu_info / custom 由服务端转义过，先还原为纯文本，插入页面时统一转义
-        function unesc(s) {
-            const t = document.createElement('textarea');
-            t.innerHTML = String(s || '');
-            return t.value;
-        }
-
-        // 只在值变化时写 DOM，动画循环每帧调用也不会引起多余的重排
-        function setText(el, v) { if (el._t !== v) { el._t = v; el.textContent = v; } }
-        function setHtml(el, v) { if (el._h !== v) { el._h = v; el.innerHTML = v; } }
-        function setStyle(el, k, v) { const key = '_s' + k; if (el[key] !== v) { el[key] = v; el.style[k] = v; } }
-
-        function isNodeOnline(raw) {
-            return Boolean(raw.online4 || raw.online6);
-        }
-
-        function isNodeAlert(raw) {
-            if (!isNodeOnline(raw)) return true;
-            const memPct = raw.memory_total > 0 ? (raw.memory_used / raw.memory_total) * 100 : 0;
-            return raw.cpu >= 85 || memPct >= 88 || raw.load_1 >= 2.0;
-        }
-
-        // 胶囊进度条颜色：<70% 绿，70-88% 黄，>=88% 红
-        function getCapsuleColor(pct, online = true) {
-            if (!online) return '#475569';
-            if (pct >= 88) return '#EF4444';
-            if (pct >= 70) return '#F59E0B';
-            return '#10B981';
-        }
-
-        function formatSpeed(bytesPerSec, compact = false, unit = prefs.speedUnit) {
-            if (!bytesPerSec || bytesPerSec < 1) {
-                return unit === 'bit' ? (compact ? '0K' : '0 Kbps') : (compact ? '0K' : '0 KB/s');
-            }
-            if (unit === 'bit') {
-                const bits = bytesPerSec * 8;
-                const gbps = bits / 1e9;
-                if (gbps >= 1) return compact ? `${gbps.toFixed(1)}G` : `${gbps.toFixed(2)} Gbps`;
-                const mbps = bits / 1e6;
-                if (mbps >= 1) return compact ? `${mbps.toFixed(1)}M` : `${mbps.toFixed(1)} Mbps`;
-                const kbps = bits / 1e3;
-                return compact ? `${kbps.toFixed(0)}K` : `${kbps.toFixed(0)} Kbps`;
-            }
-            const mb = bytesPerSec / 1048576;
-            if (mb >= 1) return compact ? `${mb.toFixed(1)}M` : `${mb.toFixed(1)} MB/s`;
-            const kb = bytesPerSec / 1024;
-            return compact ? `${kb.toFixed(0)}K` : `${kb.toFixed(0)} KB/s`;
-        }
-
-        function formatTraffic(bytes, detailed = false) {
-            if (!bytes || bytes <= 0) return detailed ? '0 MiB' : '0M';
-            const tib = bytes / (1024 ** 4);
-            if (tib >= 1) return detailed ? `${tib.toFixed(2)} TiB` : `${tib.toFixed(2)}T`;
-            const gib = bytes / (1024 ** 3);
-            if (gib >= 1) return detailed ? `${gib.toFixed(1)} GiB` : `${gib < 10 ? gib.toFixed(1) : gib.toFixed(0)}G`;
-            const mib = bytes / (1024 ** 2);
-            return detailed ? `${mib.toFixed(0)} MiB` : `${mib.toFixed(0)}M`;
-        }
-
-        function formatGiBFromKiB(usedKiB, totalKiB) {
-            const u = (usedKiB / 1048576).toFixed(1);
-            const t = (totalKiB / 1048576).toFixed(1).replace(/\.0$/, '');
-            return `${u}/${t}G`;
-        }
-
-        function formatGiBFromMiB(usedMiB, totalMiB) {
-            const u = (usedMiB / 1024).toFixed(0);
-            const t = (totalMiB / 1024).toFixed(0);
-            return `${u}/${t}G`;
-        }
-
-        function formatTime(ts) {
-            if (!ts) return '-';
-            const t = new Date(ts * 1000), p = n => ('0' + n).slice(-2);
-            return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
-        }
-
-        function fmtHM(ts) {
-            const t = new Date(ts * 1000);
-            return ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
-        }
-
-        function fmtLoss(loss) {
-            return (loss > 0 && loss < 10 ? loss.toFixed(1) : Math.round(loss)) + '%';
-        }
-
-        // 国旗图片（flagcdn），加载失败时回退为国家代码
-        function getFlagHtml(code) {
-            const text = `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-bold rounded border bg-slate-500/15 text-slate-400 border-slate-500/30 shrink-0">${/^[A-Z]{2}$/.test(code) ? code : '--'}</span>`;
-            if (!/^[A-Z]{2}$/.test(code)) return text;
-            const cc = code.toLowerCase();
-            return `<img src="https://flagcdn.com/24x18/${cc}.png" srcset="https://flagcdn.com/48x36/${cc}.png 2x" width="24" height="18" alt="${code}" loading="lazy" class="inline-block rounded-[3px] shrink-0 ring-1 ring-black/10 dark:ring-white/10" onerror="this.outerHTML='${text.replace(/"/g, '&quot;')}'">`;
-        }
-
-        /* ==========================================================================
-           3. 数据接入：json/stats.json -> 节点状态
-           ========================================================================== */
-        function normalizeServer(it, idx, now) {
-            const sys = unesc(it.custom).replace(/^系统:\s*/, '');
-            const online = Boolean(it.online4 || it.online6);
-            const location = String(it.location || '').toUpperCase();
-            return {
-                id: String(it.id || it.name || idx),
-                weight: idx,
-                name: String(it.name || it.id || '-'),
-                type: String(it.type || '-').toUpperCase(),
-                location,
-                regionGroup: regionGroupOf(location),
-                locationLabel: regionName(location),
-                sys: sys || '-',
-                os: sys.split(' (')[0] || 'Linux',
-                cpuInfo: unesc(it.cpu_info) || '-',
-                online4: Boolean(it.online4),
-                online6: Boolean(it.online6),
-                uptime: online ? (it.uptime || '-') : '离线',
-                uptimeSec: online && it.boot_time ? now - it.boot_time : -1,
-                boot_time: it.boot_time || 0,
-                load_1: Number(it.load_1) || 0,
-                cpu: Number(it.cpu) || 0,
-                network_rx: it.network_rx || 0,
-                network_tx: it.network_tx || 0,
-                network_in: it.network_in || 0,
-                network_out: it.network_out || 0,
-                monthIn: Math.max(0, (it.network_in || 0) - (it.last_network_in || 0)),
-                monthOut: Math.max(0, (it.network_out || 0) - (it.last_network_out || 0)),
-                memory_total: it.memory_total || 0,   // KiB
-                memory_used: it.memory_used || 0,
-                swap_total: it.swap_total || 0,
-                swap_used: it.swap_used || 0,
-                hdd_total: it.hdd_total || 0,         // MiB
-                hdd_used: it.hdd_used || 0,
-                io_read: it.io_read || 0,
-                io_write: it.io_write || 0,
-                tcp: it.tcp_count || 0,
-                udp: it.udp_count || 0,
-                process: it.process_count || 0,
-                thread: it.thread_count || 0,
-                time_189: it.time_189 || 0,
-                time_10010: it.time_10010 || 0,
-                time_10086: it.time_10086 || 0,
-                ping_189: it.ping_189 || 0,
-                ping_10010: it.ping_10010 || 0,
-                ping_10086: it.ping_10086 || 0
-            };
-        }
-
-        function computeDerivedTarget(raw) {
-            const online = isNodeOnline(raw);
-            const memPct = (online && raw.memory_total > 0) ? (raw.memory_used / raw.memory_total) * 100 : 0;
-            const swapPct = (online && raw.swap_total > 0) ? (raw.swap_used / raw.swap_total) * 100 : 0;
-            const hddPct = raw.hdd_total > 0 ? (raw.hdd_used / raw.hdd_total) * 100 : 0;
-            return {
-                cpu: online ? raw.cpu : 0,
-                memUsed: online ? raw.memory_used : 0,
-                memPct,
-                swapUsed: online ? raw.swap_used : 0,
-                swapPct,
-                hddUsed: raw.hdd_used,
-                hddPct,
-                rx: online ? raw.network_rx : 0,
-                tx: online ? raw.network_tx : 0,
-                netIn: raw.monthIn,
-                netOut: raw.monthOut,
-                load1: online ? raw.load_1 : 0,
-                pingCT: online ? raw.time_189 : 0,
-                pingCU: online ? raw.time_10010 : 0,
-                pingCM: online ? raw.time_10086 : 0,
-                tcp: online ? raw.tcp : 0,
-                udp: online ? raw.udp : 0,
-                proc: online ? raw.process : 0,
-                thread: online ? raw.thread : 0
-            };
-        }
-
-        function initOrUpdateNodes(list, now) {
-            const seen = new Set();
-            const label = new Date(now * 1000).toTimeString().split(' ')[0];
-            serverOrder = [];
-
-            list.forEach((it, idx) => {
-                const raw = normalizeServer(it, idx, now);
-                const id = raw.id;
-                if (seen.has(id)) return;
-                seen.add(id);
-                serverOrder.push(id);
-                const tgt = computeDerivedTarget(raw);
-
-                let st = nodeStates.get(id);
-                if (!st) {
-                    st = { raw, current: { ...tgt }, target: tgt, history: { rx: [], tx: [], labels: [] } };
-                    nodeStates.set(id, st);
-                    mountNodeDomOnce(id);
-                } else {
-                    st.raw = raw;
-                    st.target = tgt;
-                }
-                const h = st.history;
-                h.rx.push(tgt.rx); h.tx.push(tgt.tx); h.labels.push(label);
-                if (h.rx.length > NET_POINTS) { h.rx.shift(); h.tx.shift(); h.labels.shift(); }
-                patchStaticNodeDom(id);
-            });
-
-            // 主控上已删除的节点，从页面移除
-            [...nodeStates.keys()].forEach(id => {
-                if (seen.has(id)) return;
-                const ref = domRefs.get(id);
-                if (ref) { ref.trMain.remove(); ref.trDetail.remove(); ref.cardEl.remove(); }
-                domRefs.delete(id);
-                nodeStates.delete(id);
-                if (expandedId === id) expandedId = null;
-            });
-
-            updateGlobalTargets(now);
-            updateRegionCounts();
-            applySortAndFilterOrder();
-        }
-
-        /* ==========================================================================
-           4. 增量 DOM：每个节点只挂载一次，之后原地更新
-           ========================================================================== */
-        function mountNodeDomOnce(id) {
-            const trMain = document.createElement('tr');
-            trMain.className = 'cursor-pointer transition-colors hover:bg-slate-200/40 dark:hover:bg-white/[0.03]';
-            trMain.onclick = () => toggleExpandNode(id);
-
-            trMain.innerHTML = `
-                <td class="py-2.5 pl-3.5 pr-2 whitespace-nowrap"><span data-ref="statusBadge"></span></td>
-                <td class="py-2.5 px-2.5 font-sans">
-                    <div class="flex items-center gap-2" data-ref="nameTooltip">
-                        <span class="font-semibold text-xs truncate max-w-[140px]" data-ref="nodeName"></span>
-                        <svg data-ref="chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                    </div>
-                </td>
-                <td class="py-2.5 px-2 whitespace-nowrap">
-                    <span data-ref="virtBadge" class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300"></span>
-                </td>
-                <td class="py-2.5 px-2 whitespace-nowrap" data-ref="locLabel"></td>
-                <td class="py-2.5 px-2 text-right whitespace-nowrap font-sans text-xs" data-ref="uptimeText"></td>
-                <td class="py-2.5 px-2 text-right whitespace-nowrap font-semibold" data-ref="load1Text">0.00</td>
-                <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px]">
-                    <span class="text-sky-500">↓<span data-ref="rxText">0K</span></span>
-                    <span class="text-slate-300 dark:text-slate-700 mx-0.5">/</span>
-                    <span class="text-emerald-500">↑<span data-ref="txText">0K</span></span>
-                </td>
-                <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400 hidden lg:table-cell" data-ref="trafficCell">
-                    <span data-ref="netInText">0M</span> <span class="opacity-40">|</span> <span data-ref="netOutText">0M</span>
-                </td>
-                <td class="py-2.5 px-2.5 text-center whitespace-nowrap text-[11px] hidden xl:table-cell">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.04] border border-slate-200/70 dark:border-white/[0.05]">
-                        <span class="text-[#3B82F6] font-medium" data-ref="pingCT">-</span>
-                        <span class="opacity-30">/</span>
-                        <span class="text-[#F59E0B] font-medium" data-ref="pingCU">-</span>
-                        <span class="opacity-30">/</span>
-                        <span class="text-[#10B981] font-medium" data-ref="pingCM">-</span>
-                    </span>
-                </td>
-                <td class="py-2.5 px-2">
-                    <div class="ss-capsule">
-                        <div data-ref="cpuBar" class="ss-capsule-fill" style="width:0%"></div>
-                        <span data-ref="cpuLabel" class="ss-capsule-text">0%</span>
-                    </div>
-                </td>
-                <td class="py-2.5 px-2">
-                    <div class="ss-capsule">
-                        <div data-ref="memBar" class="ss-capsule-fill" style="width:0%"></div>
-                        <span data-ref="memLabel" class="ss-capsule-text">0%</span>
-                        <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/25">
-                            <div data-ref="swapBar" class="h-full bg-indigo-400" style="width:0%"></div>
-                        </div>
-                    </div>
-                </td>
-                <td class="py-2.5 pl-2 pr-3.5 hidden md:table-cell">
-                    <div class="ss-capsule">
-                        <div data-ref="hddBar" class="ss-capsule-fill" style="width:0%"></div>
-                        <span data-ref="hddLabel" class="ss-capsule-text">0%</span>
-                    </div>
-                </td>
-            `;
-
-            const trDetail = document.createElement('tr');
-            trDetail.style.backgroundColor = 'var(--bg-drawer)';
-            trDetail.innerHTML = `
-                <td colspan="12" class="p-0 border-b border-slate-200/60 dark:border-white/[0.05]">
-                    <div data-ref="drawerGrid" class="drawer-grid">
-                        <div class="drawer-inner">
-                            <div class="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 font-sans">
-                                <!-- 左：系统信息、t/u/p/d、明细 -->
-                                <div class="lg:col-span-5 surface-card rounded-xl p-4 flex flex-col justify-between space-y-3.5">
-                                    <div class="space-y-2">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 truncate" data-ref="osBadge"></span>
-                                            <span class="text-[11px] font-mono text-slate-400 shrink-0">Load: <strong class="text-slate-700 dark:text-slate-200" data-ref="loadTriple">0.00</strong></span>
+                <div class="active content">
+                    <div class="ui four stackable status cards">
+                        <div v-for="server in group.data" :id="server.ID" class="ui card">
+                            <div class="content" v-if="server.Host" style="margin-top: 10px; padding-bottom: 5px">
+                                <div class="header">
+                                    <i style="width: 22px;border-radius: 4px;" :class="'fi fi-' + server.Host.CountryCode"></i>                                    
+                                    <i v-if='isWindowsPlatform(server.Host.Platform)' class="windows icon"></i>
+                                    <i v-else-if='getFontLogoClass(server.Host.Platform) == "" && server.State.Uptime > 0' class="fl-tux"></i>
+                                    <i v-else :class="'fl-' + getFontLogoClass(server.Host.Platform)"></i>
+                                    @#server.Name + (server.live?'':'[已离线]')#@
+                                    <i @click="togglePopup($event, server.ID)" aria-expanded="false" class="nezha-secondary-font info circle icon"></i>
+                                    <div class="ui content popup" :class="{ 'visible': isActive(server.ID) }" style="margin-bottom: 0;">
+                                        <i class="closePopup window close icon" @click="closePopup(server.ID)"></i>
+                                        系统: @#server.Host.Platform#@-@#server.Host.PlatformVersion#@
+                                        [<span v-if="server.Host.Virtualization">@#server.Host.Virtualization#@:</span>@#server.Host.Arch#@]
+                                        <br />
+                                        CPU: @#server.Host.CPU#@
+                                        <br />
+                                        <template v-if="server.Host.GPU">
+                                            GPU: @#server.Host.GPU#@
+                                            <br />
+                                        </template>
+                                        硬盘:
+                                        @#formatByteSize(server.State.DiskUsed)#@/@#formatByteSize(server.Host.DiskTotal)#@
+                                        <br />
+                                        内存:
+                                        @#formatByteSize(server.State.MemUsed)#@/@#formatByteSize(server.Host.MemTotal)#@
+                                        <br />
+                                        交换:
+                                        <template v-if="server.Host.SwapTotal === 0">OFF</template>
+                                        <template v-else>@#formatByteSize(server.State.SwapUsed)#@/@#formatByteSize(server.Host.SwapTotal)#@</template>
+                                        <br />
+                                        流量:
+                                        <i class="arrow alternate circle down outline icon"></i>@#formatByteSize(server.State.NetInTransfer)#@
+                                        <i class="arrow alternate circle up outline icon"></i>@#formatByteSize(server.State.NetOutTransfer)#@
+                                        <br />
+                                        负载: @#toFixed2(server.State.Load1)#@/@#toFixed2(server.State.Load5)#@/@#
+                                        toFixed2(server.State.Load15)#@
+                                        <br />
+                                        进程数: @#server.State.ProcessCount#@
+                                        <br />
+                                        连接数: TCP @#server.State.TcpConnCount#@ / UDP @#server.State.UdpConnCount#@
+                                        <br />
+                                        启动: @#formatTimestamp(server.Host.BootTime)#@
+                                        <br />
+                                        活动: @#new Date(server.LastActive).toLocaleString()#@
+                                        <br />
+                                        <div v-if="server.State.Temperatures && getTemperature(server.State.Temperatures, sensorList) > 0" class="temp-detail" @click="toggleDetailedTemp(server.ID)" :id="`temp-${server.ID}`" temp-detail-show="0">
+                                            温度: 
+                                            <span :id="`temp-main-${server.ID}`">
+                                                @#getTemperature(server.State.Temperatures, sensorList)#@°C
+                                                <i class="bi bi-chevron-double-down"></i>
+                                            </span>
+                                            <span :id="`temp-detail-${server.ID}`" style="display:none">
+                                                <span v-for="temp in server.State.Temperatures" :key="temp.Name" v-if="temp.Temperature !== 0">
+                                                    [ @#temp.Name#@: @#temp.Temperature#@°C ]
+                                                </span>
+                                                <i class="bi bi-chevron-double-up"></i>
+                                            </span>
                                         </div>
-                                        <p class="text-xs font-mono text-slate-600 dark:text-slate-300 truncate" data-ref="customSpec"></p>
+                                        版本: @#server.Host.Version#@
+                                        <div class="chartbox" :key="server.ID" :ref="`chart${server.ID}`" style="width: 100%; height: auto; margin-bottom: 2px;"></div>
                                     </div>
-
-                                    <div class="grid grid-cols-4 gap-2 font-mono tabular-nums">
-                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
-                                            <div class="text-[10px] text-slate-400">TCP (t)</div>
-                                            <div class="text-xs font-bold mt-0.5" data-ref="tcpVal">0</div>
+                                    <div class="ui divider" style="margin-bottom: 5px"></div>
+                                </div>
+                                <div class="description">
+                                    <div class="ui grid">
+                                        <div class="three wide column">CPU</div>
+                                        <div class="thirteen wide column">
+                                            <div :class="formatPercent(server.live,server.State.CPU, 100).class">
+                                                <div class="bar" :style="formatPercent(server.live,server.State.CPU, 100).style">
+                                                    <small>@#parseInt(server.State.CPU?server.State.CPU:0)#@%</small>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
-                                            <div class="text-[10px] text-slate-400">UDP (u)</div>
-                                            <div class="text-xs font-bold mt-0.5" data-ref="udpVal">0</div>
+                                        <div class="three wide column">内存</div>
+                                        <div class="thirteen wide column">
+                                            <div :class="formatPercent(server.live,server.State.MemUsed, server.Host.MemTotal).class">
+                                                <div class="bar" :style="formatPercent(server.live,server.State.MemUsed, server.Host.MemTotal).style">
+                                                    <small>@#parseInt(server.Host.MemTotal?server.State.MemUsed/server.Host.MemTotal*100:0)#@%</small>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
-                                            <div class="text-[10px] text-slate-400">进程 (p)</div>
-                                            <div class="text-xs font-bold mt-0.5" data-ref="procVal">0</div>
+                                        <div class="three wide column">交换</div>
+                                        <div class="thirteen wide column">
+                                            <div :class="formatPercent(server.live,server.State.SwapUsed, server.Host.SwapTotal).class">
+                                                <div class="bar" :style="formatPercent(server.live,server.State.SwapUsed, server.Host.SwapTotal).style">          
+                                                    <small v-if="server.Host.SwapTotal === 0">OFF</small>
+                                                    <small v-else>@#parseInt(server.State.SwapUsed/server.Host.SwapTotal*100)#@%</small>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
-                                            <div class="text-[10px] text-slate-400">线程 (d)</div>
-                                            <div class="text-xs font-bold mt-0.5" data-ref="threadVal">0</div>
+                                        <div class="three wide column">硬盘</div>
+                                        <div class="thirteen wide column">
+                                            <div :class="formatPercent(server.live,server.State.DiskUsed, server.Host.DiskTotal).class">
+                                                <div class="bar" :style="formatPercent(server.live,server.State.DiskUsed, server.Host.DiskTotal).style">
+                                                    <small>@#parseInt(server.Host.DiskTotal?server.State.DiskUsed/server.Host.DiskTotal*100:0)#@%</small>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div class="space-y-2 text-[11px] font-mono tabular-nums">
-                                        <div class="flex justify-between gap-3">
-                                            <span class="text-slate-400 font-sans shrink-0">内存 / Swap</span>
-                                            <span class="text-right" data-ref="detailMemSwapText">-</span>
+                                        <div class="three wide column">网速</div>
+                                        <div class="thirteen wide column">
+                                            <i class="arrow alternate circle down outline icon"></i>
+                                            @#formatByteSize(server.State.NetInSpeed)#@/s
+                                            <i class="arrow alternate circle up outline icon"></i>
+                                            @#formatByteSize(server.State.NetOutSpeed)#@/s
                                         </div>
-                                        <div class="flex justify-between gap-3">
-                                            <span class="text-slate-400 font-sans shrink-0">三网丢包 (电信 / 联通 / 移动)</span>
-                                            <span class="text-right" data-ref="detailLossText">-</span>
+                                        <div class="three wide column">流量</div>
+                                        <div class="thirteen wide column">
+                                            <i class="arrow circle down icon"></i>
+                                            @#formatByteSize(server.State.NetInTransfer)#@
+                                            &nbsp;
+                                            <i class="arrow circle up icon"></i>
+                                            @#formatByteSize(server.State.NetOutTransfer)#@
                                         </div>
-                                        <div class="flex justify-between gap-3">
-                                            <span class="text-slate-400 font-sans shrink-0">磁盘 IO</span>
-                                            <span class="text-right" data-ref="detailIoText">-</span>
+                                        <div class="three wide column">信息</div>
+                                        <div class="thirteen wide column">
+                                            <i class="bi bi-cpu-fill" style="font-size: 1.1rem; color: #4a86e8;"></i>
+                                            @#getCoreAndGHz(server.Host.CPU)#@
+                                            &nbsp;
+                                            <i class="bi bi-memory" style="font-size: 1.1rem; color: #00ac0d;"></i>
+                                            @#getK2Gb(server.Host.MemTotal)#@
+                                            &nbsp;
+                                            <i class="bi bi-hdd" style="font-size: 1.1rem; color: #e41e10"></i>
+                                            @#getK2Gb(server.Host.DiskTotal)#@
                                         </div>
-                                        <div class="flex justify-between gap-3">
-                                            <span class="text-slate-400 font-sans shrink-0">启动时间</span>
-                                            <span class="text-right" data-ref="detailBootText">-</span>
+                                        <div class="three wide column">负载</div>
+                                        <div class="thirteen wide column">
+                                            <i class="bi bi-activity" style="font-size: 1.1rem; color: #e41e10;"></i>
+                                            @#toFixed2(server.State.Load1)#@ |
+                                            @#toFixed2(server.State.Load5)#@ |
+                                            @#toFixed2(server.State.Load15)#@
                                         </div>
-                                        <div class="flex justify-between gap-3">
-                                            <span class="text-slate-400 font-sans shrink-0">本月流量 / 累计</span>
-                                            <span class="text-right" data-ref="detailTrafficText">-</span>
+                                        <div class="three wide column">在线</div>
+                                        <div class="thirteen wide column">
+                                            <i class="clock icon"></i>@#secondToDate(server.State.Uptime)#@
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- 右：曲线 -->
-                                <div class="lg:col-span-7 surface-card rounded-xl p-4 flex flex-col justify-between">
-                                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                        <div class="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-black/30 border border-slate-200/70 dark:border-white/[0.06] text-xs">
-                                            <button type="button" data-ref="tabPingBtn" onclick="event.stopPropagation(); switchChartTabMode('ping')" class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer">三网 24 小时延迟 (ms)</button>
-                                            <button type="button" data-ref="tabNetBtn" onclick="event.stopPropagation(); switchChartTabMode('net')" class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer">实时网络吞吐 (↓/↑)</button>
-                                        </div>
-                                        <div data-ref="chartLegend" class="flex flex-wrap items-center gap-3 text-[11px] font-mono tabular-nums"></div>
-                                    </div>
-                                    <div class="relative w-full h-44 select-none">
-                                        <canvas data-ref="detailCanvas" class="w-full h-full block cursor-crosshair"></canvas>
-                                    </div>
-                                </div>
                             </div>
-                        </div>
-                    </div>
-                </td>
-            `;
-
-            const cardEl = document.createElement('div');
-            cardEl.className = 'surface-card rounded-xl p-4 cursor-pointer hover:border-emerald-500/40 transition flex flex-col justify-between';
-            cardEl.onclick = () => toggleExpandNode(id);
-            cardEl.innerHTML = `
-                <div>
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span data-ref="cFlag"></span>
-                            <div class="min-w-0">
-                                <h3 class="font-semibold text-sm truncate" data-ref="cName"></h3>
-                                <p class="text-[11px] text-slate-400 truncate" data-ref="cSub"></p>
-                            </div>
-                        </div>
-                        <span data-ref="cStatus" class="shrink-0"></span>
-                    </div>
-
-                    <div class="mt-3.5 space-y-2 font-mono tabular-nums text-[11px]">
-                        <div class="grid grid-cols-12 items-center gap-2">
-                            <span class="col-span-2 text-slate-400 font-sans">CPU</span>
-                            <div class="col-span-10 ss-capsule">
-                                <div data-ref="cCpuBar" class="ss-capsule-fill" style="width:0%"></div>
-                                <span data-ref="cCpuLabel" class="ss-capsule-text">0%</span>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-12 items-center gap-2">
-                            <span class="col-span-2 text-slate-400 font-sans">内存</span>
-                            <div class="col-span-10 ss-capsule">
-                                <div data-ref="cMemBar" class="ss-capsule-fill" style="width:0%"></div>
-                                <span data-ref="cMemLabel" class="ss-capsule-text">0%</span>
-                                <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/25">
-                                    <div data-ref="cSwapBar" class="h-full bg-indigo-400" style="width:0%"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-12 items-center gap-2">
-                            <span class="col-span-2 text-slate-400 font-sans">硬盘</span>
-                            <div class="col-span-10 ss-capsule">
-                                <div data-ref="cHddBar" class="ss-capsule-fill" style="width:0%"></div>
-                                <span data-ref="cHddLabel" class="ss-capsule-text">0%</span>
+                            <div class="content" v-else>
+                                <p>@#server.Name#@</p>
+                                <p>服务器已离线</p>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </template>
+    </div>
+</div>
 
-                <div class="mt-3.5 pt-2.5 border-t border-slate-200/70 dark:border-white/[0.06] flex items-center justify-between text-[11px] font-mono tabular-nums">
-                    <div>
-                        <span class="text-sky-500">↓<span data-ref="cRx">0K</span></span>
-                        <span class="text-emerald-500 ml-1">↑<span data-ref="cTx">0K</span></span>
-                    </div>
-                    <div class="text-slate-400">t/u/p/d: <span class="text-slate-600 dark:text-slate-300" data-ref="cTupd">0/0/0/0</span></div>
-                    <div><span data-ref="cPingOn"><span class="text-[#3B82F6]" data-ref="cCT">-</span>/<span class="text-[#F59E0B]" data-ref="cCU">-</span>/<span class="text-[#10B981]" data-ref="cCM">-</span>ms</span><span data-ref="cPingOff" class="text-rose-500 hidden">离线</span></div>
-                </div>
+</div>
+<div class="ui inverted vertical footer segment">
+    <div class="ui center aligned is-size-7 container">
+        <b>&copy; <a id="nzBrand" style="color: white;" href="/">云监控</a></b> | <small>Powered by <a
+                href="https://github.com/naiba/nezha" style="color: white;" target="_blank">哪吒监控</a>
+            <span id="nzVersion"></span></small>
+    </div>
+</div>
 
-                <div data-ref="cDrawerGrid" class="drawer-grid cursor-default" onclick="event.stopPropagation()">
-                    <div class="drawer-inner">
-                        <div class="pt-3 mt-3 border-t border-slate-200/70 dark:border-white/[0.06] space-y-2">
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-black/30 border border-slate-200/70 dark:border-white/[0.06] text-[11px]">
-                                    <button type="button" data-ref="cTabPingBtn" onclick="switchChartTabMode('ping')" class="px-2 py-0.5 rounded-md font-medium transition cursor-pointer">三网 24h</button>
-                                    <button type="button" data-ref="cTabNetBtn" onclick="switchChartTabMode('net')" class="px-2 py-0.5 rounded-md font-medium transition cursor-pointer">实时吞吐</button>
-                                </div>
-                                <span class="text-[10px] font-mono text-slate-400 truncate" data-ref="cSpec"></span>
-                            </div>
-                            <div class="h-36 w-full relative">
-                                <canvas data-ref="cardCanvas" class="w-full h-full block cursor-crosshair"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('serverTableBody').appendChild(trMain);
-            document.getElementById('serverTableBody').appendChild(trDetail);
-            document.getElementById('cardViewWrapper').appendChild(cardEl);
-
-            const ref = { trMain, trDetail, cardEl };
-            [trMain, trDetail, cardEl].forEach(root => {
-                root.querySelectorAll('[data-ref]').forEach(el => { ref[el.dataset.ref] = el; });
-            });
-            bindMagneticCrosshair(ref.detailCanvas);
-            bindMagneticCrosshair(ref.cardCanvas);
-            domRefs.set(id, ref);
-
-            syncAccordionClass(id);
-        }
-
-        // 不需要插值的字段：名称、状态、系统信息等，每次拉取后更新
-        function patchStaticNodeDom(id) {
-            const st = nodeStates.get(id);
-            const ref = domRefs.get(id);
-            if (!st || !ref) return;
-            const raw = st.raw;
-            const online = isNodeOnline(raw);
-
-            if (!online) {
-                setHtml(ref.statusBadge, `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">OFFLINE</span>`);
-                setHtml(ref.cStatus, `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/15 text-rose-500">OFFLINE</span>`);
-            } else {
-                const proto = raw.online4 && raw.online6 ? 'v4/v6' : (raw.online6 ? 'IPv6' : 'IPv4');
-                setHtml(ref.statusBadge, `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${proto}</span>`);
-                setHtml(ref.cStatus, `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-500">${esc(raw.uptime)}</span>`);
-            }
-            ref.trMain.classList.toggle('opacity-75', !online);
-            ref.cardEl.classList.toggle('opacity-75', !online);
-            ref.cPingOn.classList.toggle('hidden', !online);
-            ref.cPingOff.classList.toggle('hidden', online);
-
-            const flag = getFlagHtml(raw.location);
-            setHtml(ref.locLabel, flag);
-            setHtml(ref.cFlag, flag);
-            ref.locLabel.title = raw.locationLabel;
-            ref.cFlag.title = raw.locationLabel;
-            setText(ref.nodeName, raw.name);
-            setText(ref.cName, raw.name);
-            ref.nameTooltip.title = `${raw.cpuInfo}\n${raw.sys}`;
-            setText(ref.virtBadge, raw.type);
-            setText(ref.cSub, `${raw.locationLabel} · ${raw.type} · ${raw.os.split(' ')[0]}`);
-            setText(ref.uptimeText, raw.uptime);
-            ref.uptimeText.classList.toggle('text-rose-500', !online);
-            ref.uptimeText.classList.toggle('font-semibold', !online);
-            ref.trafficCell.title = `累计 ↓${formatTraffic(raw.network_in, true)} / ↑${formatTraffic(raw.network_out, true)}`;
-
-            setText(ref.osBadge, raw.sys);
-            ref.osBadge.title = raw.sys;
-            setText(ref.customSpec, raw.cpuInfo);
-            ref.customSpec.title = raw.cpuInfo;
-            setText(ref.cSpec, raw.cpuInfo);
-            setText(ref.detailLossText, online ? `${fmtLoss(raw.ping_189)} / ${fmtLoss(raw.ping_10010)} / ${fmtLoss(raw.ping_10086)}` : '-');
-            setText(ref.detailIoText, online ? `读 ${formatSpeed(raw.io_read, false, 'byte')} · 写 ${formatSpeed(raw.io_write, false, 'byte')}` : '-');
-            setText(ref.detailBootText, online ? formatTime(raw.boot_time) : '-');
-            setText(ref.detailTrafficText, `↓${formatTraffic(raw.monthIn, true)} ↑${formatTraffic(raw.monthOut, true)} / ↓${formatTraffic(raw.network_in, true)} ↑${formatTraffic(raw.network_out, true)}`);
-        }
-
-        function syncAccordionClass(id) {
-            const ref = domRefs.get(id);
-            if (!ref) return;
-            const isOpen = expandedId === id;
-            ref.drawerGrid.classList.toggle('is-open', isOpen);
-            ref.cDrawerGrid.classList.toggle('is-open', isOpen);
-            ref.chevron.classList.toggle('rotate-180', isOpen);
-            ref.chevron.classList.toggle('text-emerald-500', isOpen);
-            ref.cardEl.classList.toggle('border-emerald-500/50', isOpen);
-
-            const activeTabCls = 'rounded-md font-medium transition cursor-pointer bg-white dark:bg-[#1E2230] text-slate-900 dark:text-white shadow-sm';
-            const inactiveTabCls = 'rounded-md font-medium transition cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200';
-            ref.tabPingBtn.className = 'px-2.5 py-1 ' + (chartTab === 'ping' ? activeTabCls : inactiveTabCls);
-            ref.tabNetBtn.className = 'px-2.5 py-1 ' + (chartTab === 'net' ? activeTabCls : inactiveTabCls);
-            ref.cTabPingBtn.className = 'px-2 py-0.5 ' + (chartTab === 'ping' ? activeTabCls : inactiveTabCls);
-            ref.cTabNetBtn.className = 'px-2 py-0.5 ' + (chartTab === 'net' ? activeTabCls : inactiveTabCls);
-        }
-
-        /* ==========================================================================
-           5. 动画循环：数值向目标值平滑过渡
-           ========================================================================== */
-        function stepPhysicsLoop(now) {
-            const dt = Math.min(0.1, Math.max(0.001, (now - lastFrameTime) / 1000));
-            lastFrameTime = now;
-            const damp = 1 - Math.exp(-10 * dt);
-
-            globalPhysics.curRx += (globalPhysics.tgtRx - globalPhysics.curRx) * damp;
-            globalPhysics.curTx += (globalPhysics.tgtTx - globalPhysics.curTx) * damp;
-            globalPhysics.curTraffic += (globalPhysics.tgtTraffic - globalPhysics.curTraffic) * damp;
-
-            setText(document.getElementById('sumTotalRx'), formatSpeed(globalPhysics.curRx, false));
-            setText(document.getElementById('sumTotalTx'), formatSpeed(globalPhysics.curTx, false));
-            setText(document.getElementById('sumTotalTraffic'), formatTraffic(globalPhysics.curTraffic, true));
-            setText(document.getElementById('mobRx'), formatSpeed(globalPhysics.curRx, true));
-            setText(document.getElementById('mobTx'), formatSpeed(globalPhysics.curTx, true));
-
-            nodeStates.forEach((st, id) => {
-                const cur = st.current;
-                const tgt = st.target;
-                const raw = st.raw;
-                const online = isNodeOnline(raw);
-                const ref = domRefs.get(id);
-                if (!ref) return;
-
-                for (const k in tgt) cur[k] += (tgt[k] - cur[k]) * damp;
-
-                setText(ref.load1Text, online ? cur.load1.toFixed(2) : '-');
-                setStyle(ref.load1Text, 'color', !online ? '' : (cur.load1 >= 1.8 ? '#EF4444' : (cur.load1 >= 1.0 ? '#F59E0B' : '')));
-
-                const rxStr = online ? formatSpeed(cur.rx, true) : '0K';
-                const txStr = online ? formatSpeed(cur.tx, true) : '0K';
-                setText(ref.rxText, rxStr);
-                setText(ref.txText, txStr);
-                setText(ref.cRx, rxStr);
-                setText(ref.cTx, txStr);
-                setText(ref.netInText, `↓${formatTraffic(cur.netIn)}`);
-                setText(ref.netOutText, `↑${formatTraffic(cur.netOut)}`);
-
-                // 延迟为 0 表示尚无探测结果
-                const pingStr = (c, t) => (online && t > 0) ? `${Math.round(c)}` : '-';
-                const ctStr = pingStr(cur.pingCT, tgt.pingCT);
-                const cuStr = pingStr(cur.pingCU, tgt.pingCU);
-                const cmStr = pingStr(cur.pingCM, tgt.pingCM);
-                setText(ref.pingCT, ctStr);
-                setText(ref.pingCU, cuStr);
-                setText(ref.pingCM, cmStr);
-                setText(ref.cCT, ctStr);
-                setText(ref.cCU, cuStr);
-                setText(ref.cCM, cmStr);
-
-                const cpuW = Math.min(100, Math.max(0, cur.cpu));
-                const memW = Math.min(100, Math.max(0, cur.memPct));
-                const swapW = Math.min(100, Math.max(0, cur.swapPct));
-                const hddW = Math.min(100, Math.max(0, cur.hddPct));
-                const cpuColor = getCapsuleColor(cpuW, online);
-                const memColor = getCapsuleColor(memW, online);
-                const hddColor = getCapsuleColor(hddW, online);
-
-                [[ref.cpuBar, ref.cCpuBar, cpuW, cpuColor], [ref.memBar, ref.cMemBar, memW, memColor], [ref.hddBar, ref.cHddBar, hddW, hddColor]].forEach(([a, b, w, c]) => {
-                    const wStr = `${w.toFixed(1)}%`;
-                    setStyle(a, 'width', wStr); setStyle(a, 'backgroundColor', c);
-                    setStyle(b, 'width', wStr); setStyle(b, 'backgroundColor', c);
+<script>
+nzBoot(function (nzInitServers) {
+    var statusCards = new Vue({
+        el: '#app',
+        delimiters: ['@#', '#@'],
+        data: {
+            page: 'index',
+            defaultTemplate: "default",
+            templates: {"default": "默认"},
+            servers: [],
+            groups: [],
+            cache: [],
+            chartDataList: [],
+            activePopup: null,
+            sensorList: [
+                'TC0D', //CPU Die 温度，代表 CPU 内部的温度
+                'TC0H', //CPU Heatsink 温度，代表 CPU 散热器的温度
+                'TC0P', //CPU Proximity 温度，代表 CPU 附近的温度
+                'k10temp', //AMD K10（Phenom、Athlon、Sempron 等）系列处理器的温度监测
+                'k10temp_tctl', //AMD K10 (Athlon II、Phenom II 等）系列处理器的温度监测
+                'coretemp_package_id_0', //整个封装处理器温度
+                'cpu_thermal_zone', //全志
+                'cpu-thermal', //树莓派(博通)
+                'soc_thermal', //新瑞芯微
+                'cpu_thermal', //老瑞芯微
+                'ACPI\\ThermalZone\\TZ0__0', //Windows
+                'ACPI\\ThermalZone\\CPUZ_0', //Windows
+                'ACPI\\ThermalZone\\TZ00_0', //Windows
+                'ACPI\\ThermalZone\\TZ001_0', //Windows
+                'ACPI\\ThermalZone\\THM0_0' //Windows
+            ]
+        },
+        mixins: [mixinsVue],
+        created() {
+            this.servers = nzInitServers;
+            this.group()
+        },
+        methods: {
+            togglePopup(event, id) {
+                // 切换弹出层的激活状态
+                this.activePopup = this.activePopup === id ? null : id;
+                this.showCharts(id);
+            },
+            isActive(id) {
+                // 检查弹出层是否处于激活状态
+                return this.activePopup === id;
+            },
+            closePopup(id) {
+                this.activePopup = null;
+            },
+            showCharts(id) {
+                // 发起数据请求
+                const url = `/api/v1/monitor/${id}`;
+                nzMonitor(id)
+                    .then(data => {
+                        if (data.result && data.result.length) { // 数据请求成功，更新数据并渲染图表
+                            this.chartDataList[id - 1] = data.result;
+                            this.$nextTick(() => {
+                                this.renderCharts(id);
+                            });
+                        } else {
+                            console.log('this agent (id:' + id + ') has no monitor.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                    });
+            },
+            renderCharts(id) {
+                if (!this.chartDataList[id - 1]) return;
+                const MaxTCPPingValue = 1000 ? 1000 : 300;
+                const isMobile = this.checkIsMobile();
+                const fontSize = isMobile ? 10 : 9;
+                const itemGap = isMobile ? 6 : 6;
+                const itemWidth = isMobile ? 10 : 10;
+                const itemHeight = isMobile ? 10 : 10;
+                const gridLeft = 25;
+                const gridRight = 12;
+                const backgroundColor = '';
+                const borderColor = "#ffffff";
+                const chartData = this.chartDataList[id - 1];
+                const chartContainer = this.$refs[`chart${id}`][0];
+                const chartTheme = $('html').attr('nz-theme') == "dark" ? "dark" : "";
+                const chart = echarts.init(chartContainer, chartTheme, {
+                    renderer: 'canvas',
+                    useDirtyRect: false,
+                    width: 'auto',
+                    height: 120,
                 });
-                setStyle(ref.swapBar, 'width', `${swapW.toFixed(1)}%`);
-                setStyle(ref.cSwapBar, 'width', `${swapW.toFixed(1)}%`);
-
-                const cpuLbl = online ? `${Math.round(cpuW)}%` : '-';
-                const memLbl = !online ? '-' : (prefs.barMode === 'cap' ? formatGiBFromKiB(cur.memUsed, raw.memory_total) : `${Math.round(memW)}%`);
-                const hddLbl = prefs.barMode === 'cap' ? formatGiBFromMiB(cur.hddUsed, raw.hdd_total) : `${Math.round(hddW)}%`;
-                setText(ref.cpuLabel, cpuLbl);
-                setText(ref.cCpuLabel, cpuLbl);
-                setText(ref.memLabel, memLbl);
-                setText(ref.cMemLabel, memLbl);
-                setText(ref.hddLabel, hddLbl);
-                setText(ref.cHddLabel, hddLbl);
-
-                const tInt = Math.round(cur.tcp), uInt = Math.round(cur.udp), pInt = Math.round(cur.proc), dInt = Math.round(cur.thread);
-                setText(ref.cTupd, `${tInt}/${uInt}/${pInt}/${dInt}`);
-
-                if (expandedId === id) {
-                    setText(ref.loadTriple, online ? cur.load1.toFixed(2) : '-');
-                    setText(ref.tcpVal, String(tInt));
-                    setText(ref.udpVal, String(uInt));
-                    setText(ref.procVal, String(pInt));
-                    setText(ref.threadVal, String(dInt));
-
-                    const memUsedG = (cur.memUsed / 1048576).toFixed(2);
-                    const memTotG = (raw.memory_total / 1048576).toFixed(1);
-                    const swapUsedM = Math.round(cur.swapUsed / 1024);
-                    const swapTotM = Math.round(raw.swap_total / 1024);
-                    setText(ref.detailMemSwapText, `${memUsedG} / ${memTotG} GiB (Swap ${swapUsedM}/${swapTotM} MiB)`);
-
-                    if (chartTab === 'ping') {
-                        const item = (color, name, str, loss) =>
-                            `<span class="inline-flex items-center gap-1" style="color:${color}"><span class="w-2 h-2 rounded-full" style="background:${color}"></span>${name}: <strong>${str === '-' ? '-' : str + 'ms'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(loss)})</span></span>`;
-                        setHtml(ref.chartLegend, online
-                            ? item('#3B82F6', '电信', ctStr, raw.ping_189) + item('#F59E0B', '联通', cuStr, raw.ping_10010) + item('#10B981', '移动', cmStr, raw.ping_10086)
-                            : '<span class="text-rose-500">离线</span>');
-                    } else {
-                        setHtml(ref.chartLegend, `
-                            <span class="inline-flex items-center gap-1 text-[#0EA5E9]"><span class="w-2 h-2 rounded-full bg-[#0EA5E9]"></span>下行 RX: <strong>${formatSpeed(cur.rx, false)}</strong></span>
-                            <span class="inline-flex items-center gap-1 text-[#10B981]"><span class="w-2 h-2 rounded-full bg-[#10B981]"></span>上行 TX: <strong>${formatSpeed(cur.tx, false)}</strong></span>
-                        `);
-                    }
-
-                    renderSmoothSplineCanvas(prefs.viewMode === 'table' ? ref.detailCanvas : ref.cardCanvas, id, st, now);
-                }
-            });
-
-            requestAnimationFrame(stepPhysicsLoop);
-        }
-
-        /* ==========================================================================
-           6. 曲线（Catmull-Rom 平滑 + 十字准线读数）
-           ========================================================================== */
-        function bindMagneticCrosshair(canvas) {
-            canvas.addEventListener('mousemove', (e) => {
-                canvasHoverX = e.clientX - canvas.getBoundingClientRect().left;
-            });
-            canvas.addEventListener('mouseleave', () => { canvasHoverX = null; });
-            canvas.addEventListener('touchmove', (e) => {
-                if (e.touches.length > 0) canvasHoverX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
-            }, { passive: true });
-            canvas.addEventListener('touchend', () => { canvasHoverX = null; });
-        }
-
-        function drawCatmullRomSpline(ctx, pts) {
-            ctx.moveTo(pts[0].x, pts[0].y);
-            if (pts.length === 1) { ctx.lineTo(pts[0].x + 0.01, pts[0].y); return; }
-            for (let i = 0; i < pts.length - 1; i++) {
-                const p0 = pts[i === 0 ? i : i - 1];
-                const p1 = pts[i];
-                const p2 = pts[i + 1];
-                const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
-                ctx.bezierCurveTo(
-                    p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
-                    p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
-                    p2.x, p2.y);
-            }
-        }
-
-        // 三网历史每行 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1
-        function buildChartSeries(id, st) {
-            if (chartTab === 'ping') {
-                const d = p24.data;
-                if (!d) return { n: 0, labels: [], series: [] };
-                const n = d.slots;
-                const mk = () => Array(n).fill(null);
-                const ms = [mk(), mk(), mk()], loss = [mk(), mk(), mk()];
-                (d.nodes[id] || []).forEach(r => {
-                    const i = Math.round((r[0] - d.start) / d.step);
-                    if (i < 0 || i >= n) return;
-                    for (let k = 0; k < 3; k++) {
-                        if (r[2 + 2 * k] >= 0) ms[k][i] = r[2 + 2 * k];
-                        if (r[1 + 2 * k] >= 0) loss[k][i] = r[1 + 2 * k];
-                    }
+                const xAxisData = chartData[0].created_at.map(time => new Date(time).toLocaleString());
+                const seriesData = chartData.map(item => {
+                    let loss = 0;
+                    const data = item.avg_delay.map((avgDelay, index) => {
+                        if (avgDelay > 0 && avgDelay < MaxTCPPingValue) {
+                            loss += avgDelay > 0.9 * MaxTCPPingValue ? 1 : 0;
+                            return [item.created_at[index], avgDelay];
+                        } else {
+                            loss += 1;
+                        }
+                    });
+                    const lossRate = ((loss / item.created_at.length) * 100).toFixed(1);
+                    item.monitor_name = item.monitor_name.includes("%") ? item.monitor_name : `${item.monitor_name} ${lossRate}%`;
+                    return {
+                        name: item.monitor_name,
+                        type: 'line',
+                        smooth: true,
+                        symbol: 'none',
+                        data: data,
+                        connectNulls: true
+                    };
                 });
-                const labels = Array.from({ length: n }, (_, i) => fmtHM(d.start + i * d.step));
-                return {
-                    n, labels, isPing: true,
-                    series: [
-                        { name: '电信', data: ms[1], loss: loss[1], color: '#3B82F6' },
-                        { name: '联通', data: ms[0], loss: loss[0], color: '#F59E0B' },
-                        { name: '移动', data: ms[2], loss: loss[2], color: '#10B981' }
-                    ]
+                const option = {
+                    backgroundColor: backgroundColor,
+                    title: {
+                        show: false
+                    },
+                    tooltip: {
+                        show: true,
+                        trigger: 'axis',
+                        textStyle: {
+                            fontSize: fontSize,
+                        }
+                    },
+                    legend: {
+                        icon: 'rect',
+                        data: chartData.map(item => item.monitor_name),
+                        show: true,
+                        textStyle: {
+                            fontSize: fontSize,
+                        },
+                        lineStyle: {
+                            cap: 'butt'
+                        },
+                        top: 0,
+                        bottom: 0,
+                        itemGap: itemGap,
+                        itemWidth: itemWidth,
+                        itemHeight: itemHeight,
+                        padding: [5, 0, 5, 0]
+                    },
+                    xAxis: {
+                        type: 'time',
+                        data: xAxisData,
+                        axisLabel: {
+                            textStyle: {
+                                fontSize: fontSize
+                            }
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        axisLabel: {
+                            textStyle: {
+                                fontSize: fontSize
+                            }
+                        }
+                    },
+                    dataZoom: [
+                        {
+                            show: false,
+                            type: 'slider',
+                            start: 0,
+                            end: 100
+                        }
+                    ],
+                    series: seriesData,
+                    textStyle: {
+                        fontSize: fontSize,
+                    },
+                    grid: {
+                        top: '30',
+                        bottom: '20',
+                        left: gridLeft,
+                        right: gridRight
+                    }
                 };
-            }
-            const h = st.history;
-            const pad = Math.max(0, NET_POINTS - h.rx.length);
-            const fill = arr => Array(pad).fill(null).concat(arr);
-            return {
-                n: NET_POINTS, labels: fill(h.labels), isPing: false,
-                series: [
-                    { name: '下行', data: fill(h.rx), color: '#0EA5E9' },
-                    { name: '上行', data: fill(h.tx), color: '#10B981' }
-                ]
-            };
-        }
-
-        function renderSmoothSplineCanvas(canvas, id, st, nowMs) {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            if (rect.width < 20 || rect.height < 20) return;
-
-            const dpr = window.devicePixelRatio || 1;
-            const w = rect.width;
-            const h = rect.height;
-            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-                canvas.width = Math.round(w * dpr);
-                canvas.height = Math.round(h * dpr);
-            }
-
-            const ctx = canvas.getContext('2d');
-            ctx.save();
-            ctx.scale(dpr, dpr);
-            ctx.clearRect(0, 0, w, h);
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridStroke = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(15, 23, 42, 0.07)';
-            const axisText = isDark ? '#64748B' : '#94A3B8';
-            const padL = 42, padR = 14, padT = 12, padB = 20;
-            const plotW = w - padL - padR;
-            const plotH = h - padT - padB;
-
-            const { n, labels, series, isPing } = buildChartSeries(id, st);
-            const values = series.flatMap(s => s.data).filter(v => v != null);
-            const maxVal = Math.max(...values, isPing ? 50 : 131072) * 1.18;
-            const fmtVal = v => isPing ? `${Math.round(v)}` : formatSpeed(v, true);
-
-            ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-            ctx.fillStyle = axisText;
-            ctx.strokeStyle = gridStroke;
-            ctx.lineWidth = 1;
-            [0, 0.5, 1].forEach(r => {
-                const y = padT + plotH * r;
-                ctx.beginPath();
-                ctx.setLineDash([3, 3]);
-                ctx.moveTo(padL, y);
-                ctx.lineTo(w - padR, y);
-                ctx.stroke();
-                ctx.fillText(fmtVal(maxVal * (1 - r)), 2, y + 3);
-            });
-            ctx.setLineDash([]);
-
-            if (!values.length) {
-                ctx.textAlign = 'center';
-                ctx.fillText(isPing ? (p24.data ? '暂无三网历史数据' : '正在加载三网历史…') : '等待数据…', padL + plotW / 2, padT + plotH / 2);
-                ctx.restore();
-                return;
-            }
-
-            const firstLabel = labels.find(Boolean) || '';
-            ctx.fillText(firstLabel, padL, h - 4);
-            ctx.textAlign = 'right';
-            ctx.fillText(labels[n - 1] || '', w - padR, h - 4);
-            ctx.textAlign = 'left';
-
-            const stepX = plotW / Math.max(1, n - 1);
-            const pulseRadius = 3 + Math.sin(nowMs / 180) * 1.3;
-
-            series.forEach(s => {
-                s.pts = s.data.map((val, idx) => val == null ? null : ({
-                    x: padL + idx * stepX,
-                    y: padT + plotH - (Math.min(maxVal, Math.max(0, val)) / maxVal) * plotH
-                }));
-                // 无数据的位置断开，分段绘制
-                const segments = [];
-                let seg = null;
-                s.pts.forEach(p => {
-                    if (!p) { seg = null; return; }
-                    if (!seg) segments.push(seg = []);
-                    seg.push(p);
-                });
-
-                const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
-                grad.addColorStop(0, s.color + '28');
-                grad.addColorStop(1, s.color + '00');
-                segments.forEach(pts => {
-                    ctx.beginPath();
-                    drawCatmullRomSpline(ctx, pts);
-                    ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
-                    ctx.lineTo(pts[0].x, padT + plotH);
-                    ctx.closePath();
-                    ctx.fillStyle = grad;
-                    ctx.fill();
-
-                    ctx.beginPath();
-                    drawCatmullRomSpline(ctx, pts);
-                    ctx.strokeStyle = s.color;
-                    ctx.lineWidth = 2;
-                    ctx.lineCap = 'round';
-                    ctx.stroke();
-                });
-
-                const lastSeg = segments[segments.length - 1];
-                if (lastSeg) {
-                    const lastPt = lastSeg[lastSeg.length - 1];
-                    ctx.beginPath();
-                    ctx.arc(lastPt.x, lastPt.y, pulseRadius + 2, 0, Math.PI * 2);
-                    ctx.fillStyle = s.color + '35';
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(lastPt.x, lastPt.y, 2.8, 0, Math.PI * 2);
-                    ctx.fillStyle = s.color;
-                    ctx.fill();
+                chart.setOption(option);
+            },
+            checkIsMobile() { // 检测设备类型,页面宽度小于768px认为是移动设备
+                return window.innerWidth <= 768;
+            },
+            toFixed2(f) {
+                return f.toFixed(2)
+            },
+            isWindowsPlatform(str) {
+                return str.includes('Windows')
+            },
+            getFontLogoClass(str) {
+                if (["almalinux",
+                    "alpine",
+                    "aosc",
+                    "apple",
+                    "archlinux",
+                    "archlabs",
+                    "artix",
+                    "budgie",
+                    "centos",
+                    "coreos",
+                    "debian",
+                    "deepin",
+                    "devuan",
+                    "docker",
+                    "elementary",
+                    "fedora",
+                    "ferris",
+                    "flathub",
+                    "freebsd",
+                    "gentoo",
+                    "gnu-guix",
+                    "illumos",
+                    "kali-linux",
+                    "linuxmint",
+                    "mageia",
+                    "mandriva",
+                    "manjaro",
+                    "nixos",
+                    "openbsd",
+                    "opensuse",
+                    "pop-os",
+                    "raspberry-pi",
+                    "redhat",
+                    "rocky-linux",
+                    "sabayon",
+                    "slackware",
+                    "snappy",
+                    "solus",
+                    "tux",
+                    "ubuntu",
+                    "void",
+                    "zorin"].indexOf(str)
+                    > -1) {
+                    return str;
                 }
-            });
-
-            // 十字准线与读数
-            if (canvasHoverX !== null && canvasHoverX >= padL && canvasHoverX <= w - padR) {
-                const snapIdx = Math.min(n - 1, Math.max(0, Math.round((canvasHoverX - padL) / stepX)));
-                const snapX = padL + snapIdx * stepX;
-
-                ctx.beginPath();
-                ctx.setLineDash([2, 2]);
-                ctx.moveTo(snapX, padT);
-                ctx.lineTo(snapX, padT + plotH);
-                ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.35)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                series.forEach(s => {
-                    const p = s.pts[snapIdx];
-                    if (!p) return;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                    ctx.fillStyle = s.color;
-                    ctx.fill();
-                    ctx.strokeStyle = isDark ? '#090A0F' : '#FFFFFF';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-                });
-
-                const boxW = isPing ? 150 : 128;
-                const boxH = 20 + series.length * 15;
-                const boxX = snapX + 12 + boxW > w - padR ? snapX - boxW - 12 : snapX + 12;
-                const boxY = padT + 4;
-                ctx.fillStyle = isDark ? 'rgba(17, 19, 26, 0.92)' : 'rgba(255, 255, 255, 0.94)';
-                ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-                else ctx.rect(boxX, boxY, boxW, boxH);
-                ctx.fill();
-                ctx.stroke();
-
-                ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
-                ctx.fillText(labels[snapIdx] || '-', boxX + 8, boxY + 13);
-                series.forEach((s, idx) => {
-                    const v = s.data[snapIdx];
-                    let vText = '-';
-                    if (v != null) {
-                        vText = isPing ? `${Math.round(v)} ms` : formatSpeed(v, false);
-                        if (isPing && s.loss[snapIdx] != null) vText += `  ${fmtLoss(s.loss[snapIdx])}`;
+                if (str == 'darwin') {
+                    return 'apple';
+                }
+                if (['openwrt', 'linux'].indexOf(str) > -1) {
+                    return 'tux';
+                }
+                if (str == 'amazon') {
+                    return 'redhat';
+                }
+                if (str == 'arch') {
+                    return 'archlinux';
+                }
+                if (str.toLowerCase().includes('opensuse')) {
+                    return 'opensuse';
+                }
+                return '';
+            },
+            group() {
+                this.groups = groupingData(this.servers, "Tag")
+            },
+            formatPercent(live, used, total) {
+                const percent = live ? (parseInt(used / total * 100) || 0) : -1
+                if (!this.cache[percent]) {
+                    this.cache[percent] = {
+                        class: {
+                            ui: true,
+                            progress: true,
+                        },
+                        style: {
+                            'transition-duration': '300ms',
+                            'min-width': 'unset',
+                            width: percent + '% !important',
+                        },
+                        percent,
                     }
-                    const yPos = boxY + 27 + idx * 15;
-                    ctx.fillStyle = s.color;
-                    ctx.fillText(`${s.name}:`, boxX + 8, yPos);
-                    ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
-                    ctx.fillText(vText, boxX + 46, yPos);
+                    if (percent < 0) {
+                        this.cache[percent].style['background-color'] = 'slategray'
+                        this.cache[percent].class.offline = true
+                        if (!live) {
+                            this.cache[percent].percent = 0
+                        }
+                    } else if (percent < 51) {
+                        this.cache[percent].style['background-color'] = '#0a94f2'
+                        this.cache[percent].class.fine = true
+                    } else if (percent < 81) {
+                        this.cache[percent].style['background-color'] = 'orange'
+                        this.cache[percent].class.warning = true
+                    } else {
+                        this.cache[percent].style['background-color'] = 'crimson'
+                        this.cache[percent].class.error = true
+                    }
+                }
+                return this.cache[percent]
+            },
+            secondToDate(s) {
+                var d = Math.floor(s / 3600 / 24);
+                if (d > 0) {
+                    return d + " 天"
+                }
+                var h = Math.floor(s / 3600 % 24);
+                var m = Math.floor(s / 60 % 60);
+                var s = Math.floor(s % 60);
+                return h + ":" + ("0" + m).slice(-2) + ":" + ("0" + s).slice(-2);
+            },
+            formatTimestamp(t) {
+                return new Date(t * 1000).toLocaleString()
+            },
+            formatByteSize(bs) {
+                const x = this.readableBytes(bs)
+                return x != "NaN undefined" ? x : '0B'
+            },
+            readableBytes(bytes) {
+                if (!bytes) {
+                    return '0B'
+                }
+                const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                const sizes = ["B", "K", "M", "G", "T", "P", "E", "Z", "Y"];
+                return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + sizes[i];
+            },
+            getCoreAndGHz(arr) {
+                if ((arr || []).length === 0) {
+                    return '';
+                }
+                let totalCores = 0;
+                arr.forEach(str => {
+                    let coreMatch = str.match(/(\d+(\.\d+)?) Physical/g);
+                    let coreCount = 0;
+                    if (coreMatch) {
+                        coreCount = parseFloat(coreMatch[0]);
+                    } else {
+                        let coreMatch = str.match(/(\d+(\.\d+)?) Virtual/g);
+                        coreCount = coreMatch ? parseFloat(coreMatch[0]) : 0;
+                    }
+                    totalCores += coreCount;
+                });
+                return `${totalCores} Cores`;
+            },
+            getK2Gb(bs){
+                bs = bs / 1024 / 1024 / 1024;
+                if (bs >= 1) {
+                    return Math.ceil(bs.toFixed(2)) + 'GB';
+                } else {
+                    bs = bs * 1024;
+                    return Math.ceil(bs.toFixed(2)) + 'MB';
+                }
+            },
+            listTipsMouseenter(obj, strs, tipsNum = 1){
+                this.layerIndex = layer.tips(strs, '#' + obj, { tips: [tipsNum, 'rgb(0 0 0 / 85%)'], time: 0 });
+                $('#' + obj).attr('layerIndex', this.layerIndex)
+            },
+            listTipsMouseleave(obj){
+                layer.close(this.layerIndex)
+            },
+            toggleDetailedTemp(id){
+                const tempDom = document.getElementById(`temp-${id}`); 
+                const tempDetailShow = tempDom.getAttribute('temp-detail-show');
+                const tempMain = document.getElementById(`temp-main-${id}`); 
+                const tempDetail = document.getElementById(`temp-detail-${id}`); 
+                if (tempDetailShow == 0){
+                    tempMain.style.display = 'none';
+                    tempDetail.style.display = 'inline';
+                    tempDom.setAttribute('temp-detail-show', 1);
+                } else {
+                    tempMain.style.display = 'inline';
+                    tempDetail.style.display = 'none';
+                    tempDom.setAttribute('temp-detail-show', 0);
+                }
+            },
+            getTemperature(temperatureList, sensorList) {
+                // 将 sensorList 中的所有项转换为小写
+                const lowerCaseSensorList = sensorList.map(sensor => sensor.toLowerCase());
+
+                // 合并过滤逻辑：过滤出 Temperature 不为 0 且 Name 在 sensorList 中的元素（忽略大小写）
+                const filtered = temperatureList.filter(item => item.Temperature !== 0 && lowerCaseSensorList.includes(item.Name.toLowerCase()));
+                //console.log('filtered:',filtered);
+                
+                // 如果有匹配的元素，则计算这些元素的 Temperature 的最大值
+                if (filtered.length > 0) {
+                    return filtered.reduce((max, current) => {
+                        return current.Temperature > max ? current.Temperature : max;
+                    }, filtered[0].Temperature);
+                }
+
+                // 如果没有匹配的元素，则计算 temperatureList 中所有 Temperature 不为 0 的元素的最大值
+                const nonZeroTemps = temperatureList.filter(item => item.Temperature !== 0);
+                //console.log('nonZeroTemps:',nonZeroTemps);
+
+                if (nonZeroTemps.length > 0) {
+                    return nonZeroTemps.reduce((max, current) => {
+                        return current.Temperature > max ? current.Temperature : max;
+                    }, nonZeroTemps[0].Temperature);
+                }
+
+                // 如果所有元素的 Temperature 都为 0，则返回一个默认值 0
+                return 0;
+            }
+        }
+    })
+  
+    function groupingData(data, field) {
+        let map = {};
+        let dest = [];
+        data.forEach(item => {
+            if (!map[item[field]]) {
+                    dest.push({
+                    [field]: item[field],
+                    data: [item]
+                });
+                map[item[field]] = item;
+            } else {
+                dest.forEach(dItem => {
+                    if (dItem[field] == item[field]) {
+                        dItem.data.push(item);
+                    }
                 });
             }
-
-            ctx.restore();
+        })
+        return dest;
+    }
+  
+    let canShowError = true;
+    function connect() {
+        const wsProtocol = window.location.protocol == "https:" ? "wss" : "ws"
+        const ws = new NzSocket();
+        ws.onopen = function (evt) {
+            canShowError = true;
+            $.suiAlert({
+                title: '实时通道已建立',
+                description: '可以实时获取最新监控数据啦',
+                type: 'success',
+                time: '2',
+                position: 'top-center',
+            });
         }
-
-        /* ==========================================================================
-           7. 排序、筛选与滑块控件
-           ========================================================================== */
-        function getSortMetric(st, field) {
-            const raw = st.raw;
-            const tgt = st.target;
-            switch (field) {
-                case 'uptimeSec': return raw.uptimeSec;
-                case 'load1': return tgt.load1;
-                case 'speed': return tgt.rx + tgt.tx;
-                case 'traffic': return tgt.netIn + tgt.netOut;
-                case 'ping': {
-                    const v = [tgt.pingCT, tgt.pingCU, tgt.pingCM].filter(x => x > 0);
-                    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : (sortDir === 'desc' ? -1 : 99999);
-                }
-                case 'cpu': return tgt.cpu;
-                case 'mem': return tgt.memPct;
-                case 'hdd': return tgt.hddPct;
-                default: return raw.weight;
-            }
-        }
-
-        function cycleSort(field) {
-            if (sortField !== field) {
-                sortField = field;
-                sortDir = 'desc';
-            } else if (sortDir === 'desc') {
-                sortDir = 'asc';
-            } else {
-                sortField = null;
-                sortDir = 'desc';
-            }
-
-            ['uptimeSec', 'load1', 'speed', 'traffic', 'ping', 'cpu', 'mem', 'hdd'].forEach(f => {
-                const el = document.getElementById(`sort-${f}`);
-                if (!el) return;
-                if (sortField === f) {
-                    el.textContent = sortDir === 'desc' ? '↓' : '↑';
-                    el.className = 'text-[10px] text-emerald-500 font-bold opacity-100';
+        ws.onmessage = function (evt) {
+            const oldServers = statusCards.servers
+            const data = JSON.parse(evt.data)
+            statusCards.servers = data.servers
+            for (let i = 0; i < statusCards.servers.length; i++) {
+                const ns = statusCards.servers[i];
+                if (!ns.Host) {
+                    ns.live = false
                 } else {
-                    el.textContent = '↕';
-                    el.className = 'text-[10px] opacity-40';
-                }
-            });
-
-            applySortAndFilterOrder();
-        }
-
-        function applySortAndFilterOrder() {
-            const sortedIds = [...serverOrder].sort((aId, bId) => {
-                const stA = nodeStates.get(aId);
-                const stB = nodeStates.get(bId);
-                if (!sortField) return stA.raw.weight - stB.raw.weight;
-                const valA = getSortMetric(stA, sortField);
-                const valB = getSortMetric(stB, sortField);
-                return (sortDir === 'desc' ? (valB - valA) : (valA - valB)) || (stA.raw.weight - stB.raw.weight);
-            });
-
-            const tbody = document.getElementById('serverTableBody');
-            const cardGrid = document.getElementById('cardViewWrapper');
-            const q = searchQuery.trim().toLowerCase();
-            let visibleCount = 0;
-
-            sortedIds.forEach((id, i) => {
-                const st = nodeStates.get(id);
-                const ref = domRefs.get(id);
-                if (!st || !ref) return;
-                const raw = st.raw;
-
-                let visible = true;
-                if (regionFilter === 'ALERT') visible = isNodeAlert(raw);
-                else if (regionFilter !== 'ALL') visible = raw.regionGroup === regionFilter;
-                if (visible && q) {
-                    const hay = `${raw.name} ${raw.location} ${raw.locationLabel} ${raw.type} ${raw.sys} ${raw.cpuInfo}`.toLowerCase();
-                    visible = hay.includes(q);
-                }
-                if (visible) visibleCount++;
-
-                // 只在顺序变化时移动节点，避免每次刷新都重排 DOM
-                if (tbody.children[i * 2] !== ref.trMain) {
-                    tbody.insertBefore(ref.trMain, tbody.children[i * 2] || null);
-                    tbody.insertBefore(ref.trDetail, ref.trMain.nextSibling);
-                }
-                if (cardGrid.children[i] !== ref.cardEl) cardGrid.insertBefore(ref.cardEl, cardGrid.children[i] || null);
-
-                ref.trMain.classList.toggle('hidden', !visible);
-                ref.trDetail.classList.toggle('hidden', !visible);
-                ref.cardEl.classList.toggle('hidden', !visible);
-            });
-
-            const empty = document.getElementById('emptyFilterState');
-            empty.classList.toggle('hidden', visibleCount > 0);
-            setText(document.getElementById('emptyFilterText'),
-                !loaded ? '正在加载节点数据…' : (nodeStates.size ? '未找到匹配的服务器节点' : '还没有节点接入'));
-            document.getElementById('emptyFilterBtn').classList.toggle('hidden', !loaded || !nodeStates.size);
-        }
-
-        function updateSlidingPill(trackId, thumbId, activeVal) {
-            const track = document.getElementById(trackId);
-            const thumb = document.getElementById(thumbId);
-            if (!track || !thumb) return;
-            const btn = track.querySelector(`button[data-val="${activeVal}"]`);
-            if (!btn) return;
-
-            track.querySelectorAll('button').forEach(b => {
-                const isAct = b === btn;
-                b.classList.toggle('text-slate-900', isAct);
-                b.classList.toggle('dark:text-white', isAct);
-                b.classList.toggle('text-slate-500', !isAct);
-                b.classList.toggle('dark:text-slate-400', !isAct);
-            });
-
-            thumb.style.width = `${btn.offsetWidth}px`;
-            thumb.style.transform = `translate3d(${btn.offsetLeft}px, 0, 0)`;
-        }
-
-        function syncAllSlidingPills() {
-            updateSlidingPill('segRegion', 'thumbRegion', regionFilter);
-            updateSlidingPill('segViewMode', 'thumbViewMode', prefs.viewMode);
-            updateSlidingPill('segBarMode', 'thumbBarMode', prefs.barMode);
-            updateSlidingPill('segSpeedUnit', 'thumbSpeedUnit', prefs.speedUnit);
-        }
-
-        function setRegionFilter(val) {
-            regionFilter = val;
-            updateSlidingPill('segRegion', 'thumbRegion', val);
-            applySortAndFilterOrder();
-        }
-
-        function setViewMode(mode) {
-            prefs.viewMode = mode;
-            localStorage.setItem('ss_viewMode', mode);
-            updateSlidingPill('segViewMode', 'thumbViewMode', mode);
-            document.getElementById('tableViewWrapper').classList.toggle('hidden', mode !== 'table');
-            document.getElementById('cardViewWrapper').classList.toggle('hidden', mode !== 'cards');
-        }
-
-        function setBarLabelMode(mode) {
-            prefs.barMode = mode;
-            localStorage.setItem('ss_barMode', mode);
-            updateSlidingPill('segBarMode', 'thumbBarMode', mode);
-        }
-
-        function setSpeedUnit(unit) {
-            prefs.speedUnit = unit;
-            localStorage.setItem('ss_speedUnit', unit);
-            updateSlidingPill('segSpeedUnit', 'thumbSpeedUnit', unit);
-        }
-
-        function handleSearchInput(val) {
-            searchQuery = val;
-            applySortAndFilterOrder();
-        }
-
-        function resetAllFilters() {
-            searchQuery = '';
-            document.getElementById('searchInput').value = '';
-            setRegionFilter('ALL');
-        }
-
-        function toggleExpandNode(id) {
-            const prevId = expandedId;
-            expandedId = (expandedId === id) ? null : id;
-            if (prevId) syncAccordionClass(prevId);
-            if (expandedId) syncAccordionClass(expandedId);
-        }
-
-        function switchChartTabMode(tab) {
-            chartTab = tab;
-            if (expandedId) syncAccordionClass(expandedId);
-        }
-
-        // 地区分组：数量为 0 的分组隐藏
-        function updateRegionCounts() {
-            const counts = { ALL: 0, '亚太': 0, '北美': 0, '欧洲': 0, '其他': 0, ALERT: 0 };
-            nodeStates.forEach(st => {
-                counts.ALL++;
-                counts[st.raw.regionGroup]++;
-                if (isNodeAlert(st.raw)) counts.ALERT++;
-            });
-            Object.keys(counts).forEach(k => {
-                setText(document.getElementById(`cnt-${k}`), String(counts[k]));
-                if (k !== 'ALL' && k !== 'ALERT') {
-                    document.querySelector(`#segRegion button[data-val="${k}"]`).classList.toggle('hidden', counts[k] === 0);
-                }
-            });
-            if (regionFilter !== 'ALL' && regionFilter !== 'ALERT' && counts[regionFilter] === 0) regionFilter = 'ALL';
-            requestAnimationFrame(() => updateSlidingPill('segRegion', 'thumbRegion', regionFilter));
-        }
-
-        function updateGlobalTargets(now) {
-            let total = 0, online = 0, ipv6 = 0, rxSum = 0, txSum = 0, trafficSum = 0;
-            nodeStates.forEach(st => {
-                total++;
-                if (isNodeOnline(st.raw)) {
-                    online++;
-                    rxSum += st.target.rx;
-                    txSum += st.target.tx;
-                }
-                if (st.raw.online6) ipv6++;
-                trafficSum += st.target.netIn + st.target.netOut;
-            });
-
-            globalPhysics.tgtRx = rxSum;
-            globalPhysics.tgtTx = txSum;
-            globalPhysics.tgtTraffic = trafficSum;
-
-            setText(document.getElementById('sumOnlineCount'), `${online} / ${total}`);
-            setText(document.getElementById('sumIpv6Count'), `${ipv6} IPv6`);
-            setText(document.getElementById('mobOnline'), `${online}/${total}`);
-            setText(document.getElementById('sumUpdatedClock'), formatTime(now).slice(11));
-        }
-
-        /* ==========================================================================
-           8. 定时拉取 json/stats.json
-           ========================================================================== */
-        async function loadPing24h() {
-            if (Date.now() - p24.at < 60000) return;
-            p24.at = Date.now();
-            try {
-                const res = await fetch('json/ping24h.json', { cache: 'no-store' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                p24.data = await res.json();
-            } catch (e) {
-                p24.at = 0;
-            }
-        }
-
-        async function executeDataTick() {
-            // 暂停或页面不可见时不刷新，节省流量
-            if (isStreamPaused || document.hidden || fetching) return;
-            fetching = true;
-            loadPing24h();
-            try {
-                const res = await fetch('json/stats.json', { cache: 'no-store' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
-                // 主控更新后版本号变化，自动刷新页面加载新前端
-                if (data.version) {
-                    if (!pageVersion) pageVersion = data.version;
-                    else if (pageVersion !== data.version) setTimeout(() => location.reload(), 1000);
-                    setText(document.getElementById('footerVersion'), data.version);
-                }
-                if (data.title) {
-                    document.title = data.title;
-                    setText(document.getElementById('brandTitle'), data.title);
-                }
-                loaded = true;
-                initOrUpdateNodes(Array.isArray(data.servers) ? data.servers : [], Number(data.updated) || Date.now() / 1000);
-                if (!isStreamPaused) setStreamState('live');
-            } catch (e) {
-                if (!isStreamPaused) setStreamState('error');
-            } finally {
-                fetching = false;
-            }
-        }
-
-        function setStreamState(state) {
-            const ring = document.getElementById('streamBeaconRing');
-            const dot = document.getElementById('streamBeaconDot');
-            const lbl = document.getElementById('streamStatusLabel');
-            const btn = document.getElementById('streamToggleBtn');
-            const base = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tabular-nums border transition cursor-pointer ';
-            ring.classList.toggle('hidden', state === 'paused');
-            if (state === 'live') {
-                ring.className = 'beacon-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
-                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
-                lbl.textContent = `${POLL_MS / 1000}s 实时`;
-                btn.className = base + 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20';
-            } else if (state === 'paused') {
-                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
-                lbl.textContent = '已暂停';
-                btn.className = base + 'border-amber-500/30 bg-amber-500/10 text-amber-500';
-            } else {
-                ring.className = 'beacon-ring absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75';
-                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-rose-500';
-                lbl.textContent = '连接失败，重试中';
-                btn.className = base + 'border-rose-500/30 bg-rose-500/10 text-rose-500';
-            }
-        }
-
-        function toggleStreamPause() {
-            isStreamPaused = !isStreamPaused;
-            if (isStreamPaused) {
-                setStreamState('paused');
-            } else {
-                setStreamState('live');
-                executeDataTick();
-            }
-        }
-
-        function toggleTheme() {
-            const isDark = document.documentElement.classList.toggle('dark');
-            prefs.theme = isDark ? 'dark' : 'light';
-            localStorage.setItem('ss_theme', prefs.theme);
-        }
-
-        window.addEventListener('resize', () => {
-            requestAnimationFrame(syncAllSlidingPills);
-        });
-
-        window.addEventListener('keydown', (e) => {
-            const searchEl = document.getElementById('searchInput');
-            if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
-                e.preventDefault();
-                searchEl.focus();
-            } else if (e.key === 'Escape') {
-                if (document.activeElement === searchEl) {
-                    if (searchEl.value) resetAllFilters();
-                    searchEl.blur();
-                } else if (expandedId) {
-                    toggleExpandNode(expandedId);
+                    if (!ns.nzOnline) {
+                        ns.live = false
+                    } else {
+                        ns.live = true
+                    }
                 }
             }
-        });
-
-        // 切回标签页时立即刷新
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) executeDataTick();
-        });
-
-        /* ==========================================================================
-           9. 启动
-           ========================================================================== */
-        setViewMode(prefs.viewMode);
-        applySortAndFilterOrder();
-        requestAnimationFrame(syncAllSlidingPills);
-        if (document.fonts) document.fonts.ready.then(syncAllSlidingPills);
-        lastFrameTime = performance.now();
-        requestAnimationFrame(stepPhysicsLoop);
-        executeDataTick();
-        pollTimer = setInterval(executeDataTick, POLL_MS);
-    </script>
+            statusCards.groups = groupingData(statusCards.servers, "Tag")
+        }
+        ws.onclose = function () {
+            if (canShowError) {
+                canShowError = false;
+                $.suiAlert({
+                    title: '实时通道已断开',
+                    description: '无法实时获取最新监控数据咯',
+                    type: 'warning',
+                    time: '2',
+                    position: 'top-center',
+                });
+            }
+            setTimeout(function () {
+                connect()
+            }, 3000);
+        }
+        ws.onerror = function () {
+            ws.close()
+        }
+    }
+  
+    connect();
+  
+    $('.ui.accordion').accordion({ "exclusive": false });
+});
+</script>
 </body>
 </html>
