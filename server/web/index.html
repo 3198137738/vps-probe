@@ -316,7 +316,7 @@
                             <th class="py-2.5 pl-3.5 pr-2 w-[72px]">状态</th>
                             <th class="py-2.5 px-2.5 min-w-[165px]">节点名称</th>
                             <th class="py-2.5 px-2 w-[78px]">虚拟化</th>
-                            <th class="py-2.5 px-2 w-[92px]">位置</th>
+                            <th class="py-2.5 px-2 w-[60px]">位置</th>
                             <th onclick="cycleSort('uptimeSec')" class="sortable py-2.5 px-2 w-[82px] text-right" title="点击按在线时间排序">
                                 <span class="inline-flex items-center justify-end gap-1">在线时间<span id="sort-uptimeSec" class="text-[10px] opacity-40">↕</span></span>
                             </th>
@@ -526,24 +526,12 @@
             return (loss > 0 && loss < 10 ? loss.toFixed(1) : Math.round(loss)) + '%';
         }
 
-        function getFlagBadgeHtml(code) {
-            const styles = {
-                HK: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
-                JP: 'bg-sky-500/15 text-sky-500 border-sky-500/30',
-                SG: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
-                TW: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-                KR: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-                US: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-                DE: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
-                GB: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-                CN: 'bg-red-500/15 text-red-400 border-red-500/30',
-                NL: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-                FR: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-                RU: 'bg-teal-500/15 text-teal-400 border-teal-500/30'
-            };
-            const label = /^[A-Z]{2}$/.test(code) ? code : '--';
-            const cls = styles[code] || 'bg-slate-500/15 text-slate-400 border-slate-500/30';
-            return `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-bold rounded border ${cls} shrink-0">${label}</span>`;
+        // 国旗图片（flagcdn），加载失败时回退为国家代码
+        function getFlagHtml(code) {
+            const text = `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-bold rounded border bg-slate-500/15 text-slate-400 border-slate-500/30 shrink-0">${/^[A-Z]{2}$/.test(code) ? code : '--'}</span>`;
+            if (!/^[A-Z]{2}$/.test(code)) return text;
+            const cc = code.toLowerCase();
+            return `<img src="https://flagcdn.com/24x18/${cc}.png" srcset="https://flagcdn.com/48x36/${cc}.png 2x" width="24" height="18" alt="${code}" loading="lazy" class="inline-block rounded-[3px] shrink-0 ring-1 ring-black/10 dark:ring-white/10" onerror="this.outerHTML='${text.replace(/"/g, '&quot;')}'">`;
         }
 
         /* ==========================================================================
@@ -681,7 +669,6 @@
                 <td class="py-2.5 pl-3.5 pr-2 whitespace-nowrap"><span data-ref="statusBadge"></span></td>
                 <td class="py-2.5 px-2.5 font-sans">
                     <div class="flex items-center gap-2" data-ref="nameTooltip">
-                        <span data-ref="flag"></span>
                         <span class="font-semibold text-xs truncate max-w-[140px]" data-ref="nodeName"></span>
                         <svg data-ref="chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
@@ -689,7 +676,7 @@
                 <td class="py-2.5 px-2 whitespace-nowrap">
                     <span data-ref="virtBadge" class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300"></span>
                 </td>
-                <td class="py-2.5 px-2 whitespace-nowrap font-sans text-xs text-slate-500 dark:text-slate-400" data-ref="locLabel"></td>
+                <td class="py-2.5 px-2 whitespace-nowrap" data-ref="locLabel"></td>
                 <td class="py-2.5 px-2 text-right whitespace-nowrap font-sans text-xs" data-ref="uptimeText"></td>
                 <td class="py-2.5 px-2 text-right whitespace-nowrap font-semibold" data-ref="load1Text">0.00</td>
                 <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px]">
@@ -918,14 +905,15 @@
             ref.cPingOn.classList.toggle('hidden', !online);
             ref.cPingOff.classList.toggle('hidden', online);
 
-            const flag = getFlagBadgeHtml(raw.location);
-            setHtml(ref.flag, flag);
+            const flag = getFlagHtml(raw.location);
+            setHtml(ref.locLabel, flag);
             setHtml(ref.cFlag, flag);
+            ref.locLabel.title = raw.locationLabel;
+            ref.cFlag.title = raw.locationLabel;
             setText(ref.nodeName, raw.name);
             setText(ref.cName, raw.name);
             ref.nameTooltip.title = `${raw.cpuInfo}\n${raw.sys}`;
             setText(ref.virtBadge, raw.type);
-            setText(ref.locLabel, raw.locationLabel);
             setText(ref.cSub, `${raw.locationLabel} · ${raw.type} · ${raw.os.split(' ')[0]}`);
             setText(ref.uptimeText, raw.uptime);
             ref.uptimeText.classList.toggle('text-rose-500', !online);
