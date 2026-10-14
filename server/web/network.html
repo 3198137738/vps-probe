@@ -131,7 +131,7 @@ nzBoot(function (initData) {
                     formatter: function(params){
                         let result = params[0].axisValueLabel + "<br />";
                         params.forEach(function(item){
-                            result += item.marker + item.seriesName + ": " + item.value[1].toFixed(2) + " ms<br />";
+                            result += item.marker + item.seriesName.replace(/\s[\d.-]+ms$/, "") + ": " + item.value[1].toFixed(2) + " ms<br />";
                          })
                         return result;
                     },
@@ -285,7 +285,7 @@ nzBoot(function (initData) {
                     if (lossRate > 99) {
                         datal = [];
                     }
-                    legendName = monitorInfo.result[i].monitor_name +" "+ lossRate + "%";
+                    legendName = monitorInfo.result[i].monitor_name +" "+ nzAvgDelay(monitorInfo.result[i].avg_delay) + "ms";
                     tLegendData.push(legendName);
                     tSeries.push({
                             name: legendName,

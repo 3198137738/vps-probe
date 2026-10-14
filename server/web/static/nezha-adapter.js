@@ -152,7 +152,7 @@
             return new Promise(function (resolve) { setTimeout(function () { resolve(d); }, 0); });
         }).then(function (d) {
             var rows = (d.nodes || {})[hexOf[id]] || [];
-            var lines = [['电信', 3], ['联通', 1], ['移动', 5]];
+            var lines = [['电信网络', 3], ['移动网络', 5], ['联通网络', 1]];
             var result = rows.length ? lines.map(function (ln, k) {
                 var created = [], delay = [];
                 rows.forEach(function (r) {
@@ -168,6 +168,13 @@
             }) : [];
             return { result: result, server_name: nameOf[id] || '' };
         });
+    };
+
+    // 图例显示的平均延迟（ms，保留两位小数）：只统计有效延迟，整格丢包（0）不计入
+    window.nzAvgDelay = function (delays) {
+        var ok = (delays || []).filter(function (v) { return v > 0 && v < 1000; });
+        if (!ok.length) return '-';
+        return (ok.reduce(function (a, b) { return a + b; }, 0) / ok.length).toFixed(2);
     };
 
     // 与 WebSocket 相同的回调接口：首次成功触发 onopen，之后每次数据触发 onmessage，失败触发 onclose。

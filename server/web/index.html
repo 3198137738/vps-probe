@@ -347,7 +347,7 @@ nzBoot(function (nzInitServers) {
                         }
                     });
                     const lossRate = ((loss / item.created_at.length) * 100).toFixed(1);
-                    item.monitor_name = item.monitor_name.includes("%") ? item.monitor_name : `${item.monitor_name} ${lossRate}%`;
+                    item.monitor_name = item.monitor_name.endsWith("ms") ? item.monitor_name : `${item.monitor_name} ${nzAvgDelay(item.avg_delay)}ms`;
                     return {
                         name: item.monitor_name,
                         type: 'line',

@@ -263,7 +263,7 @@ nzBoot(function (nzInitServers) {
                         }
                     });
                     totalLossRate = ((loss / item.created_at.length) * 100).toFixed(1);
-                    legendName = `${item.monitor_name} ${totalLossRate}%`;
+                    legendName = `${item.monitor_name} ${nzAvgDelay(item.avg_delay)}ms`;
                     legendData.push(legendName);
                     seriesData.push(
                         {
@@ -412,8 +412,8 @@ nzBoot(function (nzInitServers) {
                             params.forEach(param => {
                                 const formattedTime = new Date(param.value[0]).toLocaleString();
                                 if (!param.seriesName.includes('stack')) {
-                                    const name = param.seriesName.replace(/\s\d+(\.\d+)?%$/, '');
-                                    tooltipContent += `<span style="line-height:2em">${param.marker} ${name} ${param.value[2].toFixed(1)}% ${param.value[1].toFixed(2)}</span><br>`;
+                                    const name = param.seriesName.replace(/\s[\d.-]+ms$/, '');
+                                    tooltipContent += `<span style="line-height:2em">${param.marker} ${name} ${param.value[1].toFixed(2)}ms</span><br>`;
                                 }
                             });
                             return tooltipContent;

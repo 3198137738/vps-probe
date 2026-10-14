@@ -35,8 +35,8 @@ NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 
-PING_STEP = 1200   # 三网 24 小时丢包图：每 20 分钟一格，共 72 格
-PING_SLOTS = 72
+PING_STEP = 300    # 三网 24 小时延迟历史：每 5 分钟一格，共 288 格
+PING_SLOTS = 288
 VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
@@ -50,10 +50,10 @@ DEFAULT_CONFIG = {
     "remove_offline_days": 0,    # 离线超过 N 天自动删除，0 为不删除
     "ping_interval": 60,         # 三网探测间隔（秒）
     "ping_window": 10,           # 丢包率统计窗口（次数，10 次 × 60 秒 = 10 分钟）
-    "ping": {
-        "cu": "cu.tz.cloudcpp.com:80",
-        "ct": "ct.tz.cloudcpp.com:80",
-        "cm": "cm.tz.cloudcpp.com:80",
+    "ping": {                    # 三网 TCPing 目标（山西联通 / 电信 / 移动）
+        "cu": "60.221.18.41:80",
+        "ct": "1.71.157.41:80",
+        "cm": "183.201.244.91:80",
     },
     "auto_update": True,         # 主控自动从 GitHub 更新
     "agent_auto_update": True,   # 客户端自动从主控更新
@@ -69,6 +69,9 @@ def log(*args):
     print(time.strftime("[%Y-%m-%d %H:%M:%S]"), *args, flush=True)
 
 
+OLD_PING = {"cu": "cu.tz.cloudcpp.com:80", "ct": "ct.tz.cloudcpp.com:80", "cm": "cm.tz.cloudcpp.com:80"}
+
+
 def load_config():
     cfg = dict(DEFAULT_CONFIG)
     if os.path.exists(CONFIG_FILE):
@@ -76,6 +79,8 @@ def load_config():
             cfg.update(json.load(f))
     if not cfg.get("token"):
         cfg["token"] = secrets.token_hex(16)
+    if cfg.get("ping") == OLD_PING:   # 仍是旧版默认目标的自动换成新默认目标
+        cfg["ping"] = dict(DEFAULT_CONFIG["ping"])
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
@@ -187,7 +192,7 @@ class Store:
         return sorted(self.nodes.items(), key=lambda x: self.name_key(self.name_of(x[1])))
 
     def save(self, final=False):
-        """落盘；final=True（退出 / 重启前）时连同三网历史中未满 20 分钟的当前格一起保存"""
+        """落盘；final=True（退出 / 重启前）时连同三网历史中未满一格的当前格一起保存"""
         files = []
         with self.lock:
             if final and self.hist:
@@ -249,7 +254,7 @@ class Store:
     def record(self, nid, d, now):
         """
         记录三网历史（调用方需持有锁）。客户端每次上报带有最近一个探测窗口的 [延迟, 丢包率]，
-        按 20 分钟一格取平均，节点无需改动
+        按 5 分钟一格取平均，节点无需改动
         """
         if len(d) < 24:
             return

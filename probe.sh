@@ -723,9 +723,9 @@ menu_settings() {
       6) v="$(ask "离线判定(秒): " "$(cfg_get offline_timeout)")"
          [[ "$v" =~ ^[0-9]+$ ]] && { cfg_set offline_timeout "$v" int; changed=1; } ;;
       7) local cu ct cm
-         cu="$(ask "联通 CU（域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['cu'])")")"
-         ct="$(ask "电信 CT（域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['ct'])")")"
-         cm="$(ask "移动 CM（域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['cm'])")")"
+         cu="$(ask "联通 CU（IP 或域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['cu'])")")"
+         ct="$(ask "电信 CT（IP 或域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['ct'])")")"
+         cm="$(ask "移动 CM（IP 或域名:端口）: " "$(python3 -c "import json;print(json.load(open('$CONF'))['ping']['cm'])")")"
          cfg_set ping "$(python3 -c "import json,sys;print(json.dumps(dict(cu=sys.argv[1],ct=sys.argv[2],cm=sys.argv[3])))" "$cu" "$ct" "$cm")" json
          changed=1 ;;
       8) v="$(ask "三网探测间隔(秒): " "$(cfg_get ping_interval)")"
