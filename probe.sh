@@ -434,18 +434,35 @@ EOF
   show_info
 }
 
-do_update() {
-  need_installed || return 1
+# 更新主控与网页：有新版本时下载并重启主控，等待节点重新连上
+update_server() {
   green "正在从 GitHub 获取最新版本 ..."
   local old; old="$(cat "$DIR/.version" 2>/dev/null)"
   fetch_files || return 1
   install_cli
   if [ "$old" = "$(cat "$DIR/.version")" ]; then
-    green "已是最新版本"
-  else
-    restart_server
-    echo "节点会在重连主控时自动更新客户端，网页会自动刷新为新版本"
+    green "主控已是最新版本"
+    return 0
   fi
+  restart_server
+  wait_server || { red "主控未能正常启动"; return 1; }
+  echo "网页会自动刷新为新版本"
+  blue "等待节点重新连接主控 ..."
+  sleep $(( $(cfg_get interval) * 2 + 5 ))
+}
+
+# 立即更新：主控 + 网页 → 全部节点刷新信息并更新客户端 → 显示一键安装命令，一次统一生效
+do_update() {
+  need_installed || return 1
+  blue "==== 1/3 更新主控与网页 ===="
+  update_server || return 1
+  echo
+  blue "==== 2/3 刷新全部节点信息（系统、位置、IP 协议、CPU、容量等） ===="
+  refresh_nodes
+  echo
+  blue "==== 3/3 更新全部节点客户端到最新版 ===="
+  upgrade_nodes
+  show_updated_commands
 }
 
 # ---------------------------------------------------------------- 节点管理
@@ -582,10 +599,7 @@ offer_server_update() {
   [ -n "$new" ] && [ "$new" != "$cur" ] || return 0
   yellow "GitHub 上有新版本 ${new:0:7}（主控当前 ${cur:0:7}），节点客户端随主控分发"
   confirm "是否先更新主控，再更新节点？" || return 0
-  do_update || return 1
-  blue "等待节点重新连接主控 ..."
-  wait_server || { red "主控未能正常启动"; return 1; }
-  sleep $(( $(cfg_get interval) * 2 + 5 ))
+  update_server
 }
 
 # 修改节点名称：面板立即生效，并同步写入节点本地配置
@@ -886,7 +900,7 @@ main_menu() {
   while true; do
     header
     echo "  1. 安装 / 重装主控"
-    echo "  2. 立即更新（主控 + 网页 + 节点客户端）"
+    echo "  2. 立即更新（主控 + 网页 + 全部节点，统一生效）"
     echo " ------------------ 节点 ------------------"
     echo "  3. 查看节点"
     echo "  4. 添加节点"
@@ -925,7 +939,7 @@ usage() {
 用法：probe [子命令]
   （无参数）   打开管理菜单
   install      安装 / 重装主控
-  update       立即更新
+  update       立即更新（主控 + 网页 + 全部节点，统一生效）
   list         查看节点
   add          添加节点
   del          删除节点
