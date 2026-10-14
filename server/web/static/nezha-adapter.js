@@ -174,18 +174,20 @@
             return new Promise(function (resolve) { setTimeout(function () { resolve(d); }, 0); });
         }).then(function (d) {
             var rows = (d.nodes || {})[hexOf[id]] || [];
-            var lines = [['电信网络', 3], ['移动网络', 5], ['联通网络', 1]];
+            var lines = [['山西电信', 3], ['山西移动', 5], ['山西联通', 1]];
             var result = rows.length ? lines.map(function (ln, k) {
-                var created = [], delay = [];
+                var created = [], delay = [], lossRate = [];
                 rows.forEach(function (r) {
                     var loss = r[ln[1]], ms = r[ln[1] + 1];
                     if (loss < 0 && ms < 0) return;
                     created.push(r[0] * 1000);
                     delay.push(ms >= 0 ? ms : 0);
+                    lossRate.push(loss);
                 });
+                // loss 为每格丢包率（%，-1 为无数据），哪吒原格式没有此字段，供 ServerStatus 主题统计丢包
                 return {
                     monitor_id: k + 1, server_id: id, monitor_name: ln[0], server_name: nameOf[id] || '',
-                    created_at: created, avg_delay: delay
+                    created_at: created, avg_delay: delay, loss: lossRate
                 };
             }) : [];
             return { result: result, server_name: nameOf[id] || '' };

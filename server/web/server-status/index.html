@@ -28,6 +28,36 @@
     <link rel="stylesheet" href="/static/theme-server-status/css/light.css?v20241103">
     <script src="/static/theme-server-status/js/mixin.js?v20240915"></script>
     <script src="/static/nezha-adapter.js"></script>
+    <style>
+        /* 节点详情中的三网延迟卡片 */
+        .nz-ping-card { margin: 10px 0 6px; border: 1px solid #e5e7eb; border-radius: 12px; background: rgba(255,255,255,0.92); overflow: hidden; text-align: left; }
+        .nz-ping-head { display: flex; flex-wrap: wrap; border-bottom: 1px solid #e5e7eb; }
+        .nz-ping-title, .nz-ping-stat { padding: 16px 24px; }
+        .nz-ping-title { flex: 0 0 150px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid #e5e7eb; }
+        .nz-ping-stat { flex: 1 1 0; min-width: 0; border-right: 1px solid #e5e7eb; }
+        .nz-ping-stat:last-child { border-right: none; }
+        .nz-ping-server { font-size: 18px; font-weight: 700; color: #111; word-break: break-all; }
+        .nz-ping-label { font-size: 13px; color: #666; margin-top: 2px; }
+        .nz-ping-value { font-size: 24px; font-weight: 700; color: #111; line-height: 1.3; }
+        .nz-ping-sub { font-size: 13px; color: #777; }
+        .nz-ping-sub span { margin-right: 8px; }
+        .nz-ping-down { color: #16a34a; }
+        .nz-ping-up { color: #dc2626; }
+        body[theme="dark"] .nz-ping-card { background: rgba(28,29,38,0.85); border-color: rgba(255,255,255,0.1); }
+        body[theme="dark"] .nz-ping-head, body[theme="dark"] .nz-ping-title, body[theme="dark"] .nz-ping-stat { border-color: rgba(255,255,255,0.1); }
+        body[theme="dark"] .nz-ping-server, body[theme="dark"] .nz-ping-value { color: #f1f1f1; }
+        body[theme="dark"] .nz-ping-label, body[theme="dark"] .nz-ping-sub { color: #a0a4ae; }
+        body[theme="dark"] .nz-ping-down { color: #22c55e; }
+        body[theme="dark"] .nz-ping-up { color: #f87171; }
+        @media (max-width: 768px) {
+            .nz-ping-title { flex: 1 0 100%; border-right: none; border-bottom: 1px solid #e5e7eb; padding: 10px 12px; }
+            body[theme="dark"] .nz-ping-title { border-color: rgba(255,255,255,0.1); }
+            .nz-ping-stat { padding: 10px 12px; }
+            .nz-ping-value { font-size: 17px; }
+            .nz-ping-label, .nz-ping-sub { font-size: 11px; }
+            .nz-ping-sub span { margin-right: 4px; }
+        }
+    </style>
 </head>
 <body>
 <div id="app">
@@ -1117,7 +1147,7 @@ nzBoot(function (nzInitServers) {
                     if (!isAriaExpandedFalse) return;
                 }
                 // 本处理函数先于 Bootstrap 执行：先给图表占好高度，展开动画才会一次展开到位，不会在结束后再被图表撑高
-                chartContainer.style.minHeight = '300px';
+                chartContainer.style.minHeight = this.isMobile ? '420px' : '430px';
                 // 等展开动画结束再绘制，避免绘图与动画抢主线程造成卡顿
                 const collapse = $('#rt' + id);
                 const shown = new Promise(resolve => {
@@ -1145,206 +1175,127 @@ nzBoot(function (nzInitServers) {
                 if (!this.chartDataList[id]) return;
                 const chartData = this.chartDataList[id];
                 const chartContainer = document.getElementById(`chart-${id}`);
-                if (reload) {
-                    const existingChart = echarts.getInstanceByDom(chartContainer);
+                const oldChart = chartContainer.querySelector('.nz-ping-chart');
+                if (oldChart) {
+                    const existingChart = echarts.getInstanceByDom(oldChart);
                     if (existingChart) existingChart.dispose();
-                    const chartboxShow = chartContainer.getAttribute('chartbox-show');
-                    if ( chartboxShow === '0' ) return; 
                 }
-                const MaxTCPPingValue = 1000 ? 1000 : 300;
-                const fontSize = this.isMobile ? 10 : 14;
-                const gridLeft = (MaxTCPPingValue > 500) ? (this.isMobile ? 36 : 42) : (this.isMobile ? 25 : 36);
-                const gridRight = this.isMobile ? 5 : 20;
-                const legendLeft = this.isMobile ? 'center' : 'center';
-                const legendTop = this.isMobile ? 5 : 5;
-                const legendPadding= this.isMobile ? [5,0,5,0] : [5,0,5,0];
-                const systemDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                const theme = localStorage.getItem("theme") ? localStorage.getItem("theme") : systemDarkMode;
-                const chartTheme = this.theme == "dark" ? "dark" : "default";
-                const fontColor = this.theme == "dark" ? "#f1f1f1" : "#000000";
-                const backgroundColor = theme == "dark" ? '' : '';
-                const tooltipBackgroundColor = this.theme == "dark" ? (this.semiTransparent ? "rgba(28,29,38,0.85)" : "rgba(28,29,38,1)") : (this.semiTransparent ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,1)");
-                const tooltipBorderColor = this.theme == "dark" ? (this.semiTransparent ? "rgba(28,29,38,0.9)" : "rgba(28,29,38,1)") : (this.semiTransparent ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,1)");
-                const lineStyleWidth = this.isMobile ? 1 : 2;
-                const splitLineWidth = this.isMobile ? 0.5 : 1;
-                const markLineItemStyleOpacity = this.semiTransparent ? 1 : 0.75;
-                const markLineLineStyleWidth = this.isMobile ? 0.15 : 0.3;
-                const chart = echarts.init(chartContainer, chartTheme, { // init图表
+                chartContainer.innerHTML = '';
+                if (reload && chartContainer.getAttribute('chartbox-show') === '0') return;
+                const dark = this.theme == "dark";
+                const colors = { '山西电信': '#e8892e', '山西移动': '#e0306a', '山西联通': '#2a5ad8' };
+                const fallbackColors = ['#e8892e', '#e0306a', '#2a5ad8'];
+                const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+                // 每条线路的平均 / 最低 / 最高延迟与平均丢包率；整格丢包（延迟 0）不计入延迟
+                const lines = chartData.map((item, k) => {
+                    const ok = item.avg_delay.filter(v => v > 0);
+                    const loss = (item.loss || []).filter(v => v >= 0);
+                    return {
+                        name: item.monitor_name,
+                        color: colors[item.monitor_name] || fallbackColors[k % 3],
+                        avg: ok.length ? (ok.reduce((a, b) => a + b, 0) / ok.length).toFixed(2) + 'ms' : '-',
+                        min: ok.length ? Math.round(Math.min(...ok)) : '-',
+                        max: ok.length ? Math.round(Math.max(...ok)) : '-',
+                        loss: loss.length ? (loss.reduce((a, b) => a + b, 0) / loss.length).toFixed(2) + '%' : '-',
+                        data: item.created_at.map((t, i) => [t, item.avg_delay[i] > 0 ? item.avg_delay[i] : null])
+                    };
+                });
+                const serverName = (chartData[0] && chartData[0].server_name) || '';
+                // 卡片顶部：节点名 + 各线路统计（顺序与图例相反，与参考样式一致）
+                const stats = lines.slice().reverse().map(l => `
+                    <div class="nz-ping-stat">
+                        <div class="nz-ping-label">${escape(l.name)}</div>
+                        <div class="nz-ping-value">${l.avg}</div>
+                        <div class="nz-ping-sub"><span class="nz-ping-down">↓${l.min}</span><span class="nz-ping-up">↑${l.max}</span><span>${l.loss}</span></div>
+                    </div>`).join('');
+                chartContainer.innerHTML = `
+                    <div class="nz-ping-card">
+                        <div class="nz-ping-head">
+                            <div class="nz-ping-title">
+                                <div class="nz-ping-server">${escape(serverName)}</div>
+                                <div class="nz-ping-label">${lines.length} 个监控服务</div>
+                            </div>
+                            ${stats}
+                        </div>
+                        <div class="nz-ping-chart"></div>
+                    </div>`;
+                const fontSize = this.isMobile ? 11 : 13;
+                const axisColor = dark ? '#a0a4ae' : '#666666';
+                const fontColor = dark ? '#f1f1f1' : '#222222';
+                const tooltipBackgroundColor = dark ? (this.semiTransparent ? "rgba(28,29,38,0.85)" : "rgba(28,29,38,1)") : (this.semiTransparent ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,1)");
+                // 纵轴分 4 格，上限取整到便于阅读的数值（如 3800ms → 每格 950ms）
+                const maxDelay = Math.max(1, ...lines.flatMap(l => l.data.map(d => d[1] || 0)));
+                const step = maxDelay > 400 ? 200 : 20;
+                const yMax = Math.ceil(maxDelay / step) * step;
+                const chart = echarts.init(chartContainer.querySelector('.nz-ping-chart'), null, {
                     renderer: 'canvas',
-                    useDirtyRect: false,
-                    width: 'auto',
-                    height: 300
+                    height: this.isMobile ? 280 : 330
                 });
-                let legendData = [];
-                let seriesData = [];
-                chartData.forEach((item,key)=> {
-                    let loss = 0;
-                    let totalLossRate = 0;
-                    let legendName = '';
-                    let data = { main: [], markLine: []};
-                    item.avg_delay.forEach((avgDelay, index) => {
-                        const threshold = 0.9 * MaxTCPPingValue; // 定义阀值,用于判断是否丢包
-                        // 定义丢包 1. avgDelay==0  2. avgDelay>=MaxTCPPingValue 3. avgDelay>=threshold
-                        if(avgDelay == 0 || avgDelay >= MaxTCPPingValue){ //绝对丢包
-                            loss += 1;
-                            const lossrate = 100 * loss / (index + 1);
-                            if(lossrate != 100) {
-                                data['markLine'].push({
-                                    xAxis: item.created_at[index],
-                                    label: { show: false },
-                                    emphasis: { disabled: true },
-                                    lineStyle: { type: "solid" }
-                                });
-                            }
-                        } else if (avgDelay >= threshold && avgDelay < MaxTCPPingValue){ // 相对丢包
-                            loss += 1;
-                            const lossrate = 100 * loss / (index + 1);
-                            if(lossrate != 100) {
-                                data['main'].push(
-                                    [item.created_at[index], avgDelay, lossrate]
-                                );
-                                data['markLine'].push({
-                                    xAxis: item.created_at[index],
-                                    label: { show: false },
-                                    emphasis: { disabled: true },
-                                    lineStyle: { type: "solid" }
-                                });
-                            }
-                        } else { // 未丢包
-                            const lossrate = 100 * loss / (index + 1);
-                            data['main'].push(
-                                [item.created_at[index], avgDelay, lossrate]
-                            );
-                        }
-                    });
-                    totalLossRate = ((loss / item.created_at.length) * 100).toFixed(1);
-                    legendName = `${item.monitor_name} ${nzAvgDelay(item.avg_delay)}ms`;
-                    legendData.push(legendName);
-                    seriesData.push(
-                        {
-                            name: legendName,
-                            type: 'line',
-                            smooth: true,
-                            symbol: 'none',
-                            connectNulls: true,
-                            legendHoverLink: false,
-                            emphasis: {
-                                disabled: true
-                            },
-                            lineStyle: {
-                                width: lineStyleWidth
-                            },  
-                            data: data['main'],
-                            markLine: {
-                                symbol: "none",
-                                symbolSize :0,
-                                data: data['markLine'],
-                                itemStyle: { 
-                                    opacity: markLineItemStyleOpacity
-                                },
-                                lineStyle:{
-                                    width: markLineLineStyleWidth
-                                }
-                            }
-                        }
-                    );
-                });
-                const maxLegendsPerRowMobile = localStorage.getItem("maxLegendsPerRowMobile") ? localStorage.getItem("maxLegendsPerRowMobile") : 3;
-                const maxLegendsPerRowPc = localStorage.getItem("maxLegendsPerRowPc") ? localStorage.getItem("maxLegendsPerRowPc") : 6;
-                const autoIncrement = Math.floor((legendData.length - 1) / (this.isMobile ? maxLegendsPerRowMobile : maxLegendsPerRowPc)) * (this.isMobile ? 20 : 28);            
-                const height = 300 + autoIncrement;
-                const gridTop = 40 + autoIncrement;
-                const legendIcon = this.isMobile ? 'rect' : ""; 
-                const itemWidth = this.isMobile ? 10 : 25;
-                const itemHeight = this.isMobile ? 10 : 14;
-                chart.resize({
-                    width: 'auto',
-                    height: height
-                });
-                const option = {
+                chart.setOption({
                     animation: false,
-                    color: this.colors,
-                    backgroundColor: backgroundColor,
-                    textStyle: {
-                        fontSize: fontSize,
-                        color: fontColor
-                    },
-                    grid: {
-                        top: gridTop,
-                        left: gridLeft,
-                        right: gridRight,
-                    },
-                    title: {
-                        show: false,
-                    },
-                    series: seriesData.flat(),
-                    xAxis: {
-                        type: 'time',
-                        axisLabel: {
-                            textStyle: {
-                                fontSize: fontSize
-                            }
-                        }
-                    },
-                    yAxis: {
-                        type: 'value',
-                        axisLabel: {
-                            textStyle: {
-                                fontSize: fontSize
-                            }
-                        },
-                        splitLine: {
-                            lineStyle: {
-                                width: splitLineWidth
-                            }
-                        }
-                    },
-                    legend: {
-                        data: legendData,
-                        show: true,
-                        icon: legendIcon,
-                        textStyle: {
-                            fontSize: fontSize,
-                            color: fontColor
-                        },
-                        top: legendTop,
-                        bottom: 0,
-                        left: legendLeft,
-                        padding: legendPadding,
-                        itemWidth: itemWidth,
-                        itemHeight: itemHeight,
-                    },
+                    backgroundColor: 'transparent',
+                    color: lines.map(l => l.color),
+                    textStyle: { fontSize: fontSize, color: fontColor },
+                    grid: { top: 30, left: 16, right: this.isMobile ? 16 : 28, bottom: 56, containLabel: true },
                     tooltip: {
                         trigger: 'axis',
                         backgroundColor: tooltipBackgroundColor,
-                        borderColor: tooltipBorderColor,
-                        textStyle: {
-                            fontSize: fontSize,
-                            color: fontColor
-                        },
-                        formatter: function (params) {
-                            let tooltipContent = '';
-                            const formattedTime = new Date(params[0].value[0]).toLocaleString(); 
-                            tooltipContent += `<span style="line-height:2em">${formattedTime}</span><br>`;
-                            params.forEach(param => {
-                                const formattedTime = new Date(param.value[0]).toLocaleString();
-                                if (!param.seriesName.includes('stack')) {
-                                    const name = param.seriesName.replace(/\s[\d.-]+ms$/, '');
-                                    tooltipContent += `<span style="line-height:2em">${param.marker} ${name} ${param.value[1].toFixed(2)}ms</span><br>`;
-                                }
+                        borderColor: tooltipBackgroundColor,
+                        textStyle: { fontSize: fontSize, color: fontColor },
+                        formatter: params => {
+                            let html = `<span style="line-height:2em">${new Date(params[0].value[0]).toLocaleString()}</span><br>`;
+                            params.forEach(p => {
+                                const v = p.value[1];
+                                html += `<span style="line-height:2em">${p.marker} ${escape(p.seriesName)} ${v == null ? '丢包' : v.toFixed(2) + 'ms'}</span><br>`;
                             });
-                            return tooltipContent;
+                            return html;
                         }
                     },
-                    dataZoom: [
-                        {
-                            type: 'slider',
-                            start: 0,
-                            end: 100
-                        }
-                    ]
-                };
-                chart.setOption(option);
+                    legend: {
+                        bottom: 8,
+                        icon: 'rect',
+                        itemWidth: 10,
+                        itemHeight: 10,
+                        itemGap: 20,
+                        textStyle: { fontSize: fontSize, color: fontColor },
+                        data: lines.map(l => l.name)
+                    },
+                    xAxis: {
+                        type: 'time',
+                        axisLine: { lineStyle: { color: dark ? '#3a3d47' : '#d9d9d9' } },
+                        axisTick: { show: false },
+                        splitLine: { show: false },
+                        axisLabel: { color: axisColor, fontSize: fontSize, hideOverlap: true, formatter: '{H}:{mm}' }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        min: 0,
+                        max: yMax,
+                        interval: yMax / 4,
+                        axisLabel: { color: axisColor, fontSize: fontSize, formatter: v => v + 'ms' },
+                        splitLine: { lineStyle: { color: dark ? 'rgba(255,255,255,0.06)' : '#f2f2f2' } }
+                    },
+                    series: lines.map(l => ({
+                        name: l.name,
+                        type: 'line',
+                        symbol: 'none',
+                        connectNulls: false,
+                        emphasis: { disabled: true },
+                        lineStyle: { width: 1.2 },
+                        data: l.data
+                    }))
+                });
+                chartContainer.style.minHeight = '';
+                // 窗口大小变化时图表跟随调整宽度（只注册一次）
+                if (!window.nzPingResize) {
+                    window.nzPingResize = true;
+                    window.addEventListener('resize', () => {
+                        document.querySelectorAll('.nz-ping-chart').forEach(el => {
+                            const c = echarts.getInstanceByDom(el);
+                            if (c) c.resize();
+                        });
+                    });
+                }
             },
             reloadCharts() {
                 this.servers.forEach(node => {
