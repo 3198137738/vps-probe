@@ -29,6 +29,7 @@ from urllib.parse import parse_qs, urlparse
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("PROBE_DATA", BASE_DIR)
 WEB_DIR = os.path.join(BASE_DIR, "web")
+THEMES = {"default": "/", "server-status": "/server-status/"}   # 主题 -> 页面所在目录
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
@@ -40,6 +41,7 @@ VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
     "title": "云监控",
+    "theme": "default",          # 网页默认主题：default / server-status（访客可在页面「主题」菜单中切换）
     "http_port": 8080,
     "agent_port": 35688,
     "token": "",
@@ -619,9 +621,10 @@ class WebHandler(BaseHTTPRequestHandler):
             body, gz = STORE.history()
             return self.send(200, body, gz=gz)
         path = "/index.html" if url.path == "/" else url.path
+        if path in ("/index.html", "/network", "/network.html"):
+            # 首页与网络页按主题返回：浏览器选择的主题（cookie）优先，否则用设置中的默认主题
+            path = THEMES[self.theme()] + ("index.html" if path == "/index.html" else "network.html")
         full = os.path.realpath(os.path.join(WEB_DIR, path.lstrip("/")))
-        if not os.path.splitext(full)[1] and os.path.isfile(full + ".html"):
-            full += ".html"   # /network -> network.html
         if not full.startswith(os.path.realpath(WEB_DIR) + os.sep) or not os.path.isfile(full):
             return self.send(404, b"not found", "text/plain")
         # 静态文件每次向服务端确认是否变化（未变化返回 304，几乎不耗流量），更新后立即生效
@@ -629,7 +632,7 @@ class WebHandler(BaseHTTPRequestHandler):
         etag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
         is_page = full.endswith(".html")
         if is_page:
-            etag = etag[:-1] + "-" + VERSION[:7] + '"'
+            etag = etag[:-1] + "-" + VERSION[:7] + "-" + hashlib.md5(full.encode()).hexdigest()[:6] + '"'
         if self.headers.get("If-None-Match") == etag:
             self.send_response(304)
             self.send_header("ETag", etag)
@@ -648,6 +651,12 @@ class WebHandler(BaseHTTPRequestHandler):
         self.send(200, data, ctype, "no-cache", gzip.compress(data, 6), etag)
 
     do_HEAD = do_GET
+
+    def theme(self):
+        cookie = re.search(r"(?:^|;)\s*preferred_theme=([\w-]+)", self.headers.get("Cookie", ""))
+        if cookie and cookie.group(1) in THEMES:
+            return cookie.group(1)
+        return CFG.get("theme") if CFG.get("theme") in THEMES else "default"
 
     def install(self, path):
         """

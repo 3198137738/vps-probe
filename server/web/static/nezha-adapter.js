@@ -95,6 +95,14 @@
         return { now: now, servers: servers };
     }
 
+    // 页面中的品牌名、版本号（主题模板里可能出现多处）
+    function setText(kind, text) {
+        var els = document.querySelectorAll('[data-nz="' + kind + '"]');
+        for (var i = 0; i < els.length; i++) {
+            if (els[i].textContent !== text) els[i].textContent = text;
+        }
+    }
+
     window.nzFetchStats = function () {
         return fetch('/json/stats.json', { cache: 'no-store' }).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -104,13 +112,11 @@
             if (data.version) {
                 if (!pageVersion) pageVersion = data.version;
                 else if (pageVersion !== data.version) setTimeout(function () { location.reload(); }, 1000);
-                var v = document.getElementById('nzVersion');
-                if (v) v.textContent = data.version;
+                setText('version', data.version);
             }
             if (data.title) {
                 document.title = data.title;
-                var b = document.getElementById('nzBrand');
-                if (b) b.textContent = data.title;
+                setText('brand', data.title);
             }
             return convert(data);
         });
@@ -160,9 +166,14 @@
         });
     };
 
-    // 与 WebSocket 相同的回调接口：首次成功触发 onopen，之后每次数据触发 onmessage，失败触发 onclose
+    // 与 WebSocket 相同的回调接口：首次成功触发 onopen，之后每次数据触发 onmessage，失败触发 onclose。
+    // 同一时间只保留最新的一个连接，避免主题脚本重连时重复拉取
+    var current = null;
     window.NzSocket = function () {
         var self = this, timer = null, opened = false, closed = false;
+        if (current) current.stop();
+        current = this;
+        this.readyState = 0;
 
         function tick() {
             if (closed) return;
@@ -175,6 +186,7 @@
                 if (closed) return;
                 if (!opened) {
                     opened = true;
+                    self.readyState = 1;
                     if (self.onopen) self.onopen({});
                 }
                 if (self.onmessage) self.onmessage({ data: JSON.stringify(d) });
@@ -184,12 +196,24 @@
             });
         }
 
+        // 被新连接取代：静默停止
+        this.stop = function () {
+            closed = true;
+            self.readyState = 3;
+            clearTimeout(timer);
+        };
         this.close = function () {
             if (closed) return;
-            closed = true;
-            clearTimeout(timer);
+            self.stop();
             if (self.onclose) self.onclose({});
         };
         setTimeout(tick, 0);
     };
+
+    // 主题切换只提供本项目包含的主题
+    if (typeof mixinsVue !== 'undefined') {
+        mixinsVue.data.adaptedTemplates = mixinsVue.data.adaptedTemplates.filter(function (t) {
+            return t.key === 'default' || t.key === 'server-status';
+        });
+    }
 })();

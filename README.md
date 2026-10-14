@@ -1,6 +1,6 @@
 # 云监控探针
 
-轻量级 VPS 探针，前端采用哪吒监控 v0 默认主题。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
+轻量级 VPS 探针，前端采用哪吒监控 v0 主题（默认 / ServerStatus，页面「主题」菜单可切换）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
 
 监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点名右侧的信息图标可查看详情（系统、CPU、硬盘、内存、交换、流量、负载、进程数、连接数、启动时间与三网 24 小时延迟图），「网络」页可查看各节点三网延迟曲线。
 
@@ -97,6 +97,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
 | `title` | 云监控 | 页面标题 |
+| `theme` | default | 网页默认主题：`default` / `server-status` |
 | `http_port` / `agent_port` | 8080 / 35688 | 网页端口 / 上报端口 |
 | `interval` | 3 | 客户端上报间隔（秒），下发给所有客户端 |
 | `offline_timeout` | 15 | 超过多少秒无数据判为离线 |
@@ -141,9 +142,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 
 ## 前端
 
-前端为[哪吒监控](https://github.com/nezhahq/nezha) v0（`v0-final` 分支）默认主题，页面结构与样式原样保留（Apache-2.0，许可证见 `server/web/static/LICENSE-nezha`），Semantic UI、Vue、ECharts 等依赖与原版一样从 unpkg 加载。
+前端为[哪吒监控](https://github.com/nezhahq/nezha) v0（`v0-final` 分支）的默认主题与 ServerStatus 主题，页面结构与样式原样保留（Apache-2.0，许可证见 `server/web/static/LICENSE-nezha`），Semantic UI、Vue、ECharts 等依赖与原版一样从 unpkg 加载。
 
-`server/web/static/nezha-adapter.js` 负责把 `/json/stats.json`、`/json/ping24h.json` 转换为哪吒的数据格式，并以每 2 秒拉取一次代替原版的 WebSocket。节点弹窗中的延迟图与「网络」页使用三网 24 小时历史。本项目没有服务监控与后台，菜单中不显示「服务」「主题」「登录」。
+`server/web/static/nezha-adapter.js` 负责把 `/json/stats.json`、`/json/ping24h.json` 转换为哪吒的数据格式，并以每 2 秒拉取一次代替原版的 WebSocket。节点弹窗中的延迟图与「网络」页使用三网 24 小时历史。本项目没有服务监控与后台，菜单中不显示「服务」「登录」。
+
+访客通过页面「主题」菜单切换主题（保存在浏览器 cookie `preferred_theme`），未选择时使用设置中的默认主题（`probe` →「修改设置」→「网页默认主题」，或配置项 `theme`）。
 
 ## 目录结构
 
@@ -151,7 +154,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 agent/agent.py        Linux 客户端
 agent/agent.ps1       Windows 客户端（PowerShell）
 server/server.py      服务端（TCP 上报 + HTTP 网页）
-server/web/           前端页面（哪吒 v0 默认主题，数据接口 /json/stats.json 与 /json/ping24h.json）
+server/web/           前端页面（哪吒 v0 默认主题，server-status/ 为 ServerStatus 主题；数据接口 /json/stats.json 与 /json/ping24h.json）
 probe.sh              主控管理脚本（安装 / 更新 / 节点管理 / 设置 / 卸载）
 install.sh            Linux 客户端安装 / 卸载
 install.ps1           Windows 客户端安装 / 卸载

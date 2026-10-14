@@ -1,0 +1,475 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>云监控</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta content="telephone=no" name="format-detection">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="/static/manifest-zh-CN.json?v20240905" />
+    <link rel="apple-touch-startup-image" href="/static/logo.svg" />
+    <link rel="shortcut icon" type="image/png" href="/static/logo.svg">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap@3.4.1/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/font-logos@0.17.0/assets/font-logos.css">
+    <link rel="stylesheet" href="https://unpkg.com/flag-icons@7.2.3/css/flag-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/semantic-ui@2.4.0/dist/semantic.min.css">
+    <script src="https://unpkg.com/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/bootstrap@3.4.1/dist/js/bootstrap.min.js"></script>
+    <script src="https://unpkg.com/vue@2.6.14/dist/vue.min.js"></script>
+    <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="/static/theme-server-status/css/main.css?v20241103">
+    <link rel="stylesheet" href="/static/theme-server-status/css/dark.css?v20241103">
+    <link rel="stylesheet" href="/static/theme-server-status/css/light.css?v20241103">
+    <script src="/static/theme-server-status/js/mixin.js?v20240915"></script>
+    <script src="/static/nezha-adapter.js"></script>
+</head>
+<body>
+<div id="app">
+
+
+<header role="navigation" class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <button data-target=".navbar-collapse" data-toggle="collapse" class="navbar-toggle" type="button">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a href="/" class="navbar-brand">
+                <img src="/static/logo.svg" style="height: 2rem;display: inline-block;">
+                <span data-nz="brand">云监控</span>
+            </a>
+        </div>
+        <nav id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+                <li :class="isMenuActive('index')"><a href="/"><i class="home icon"></i>首页</a></li>
+                <li :class="isMenuActive('network')"><a href="/network"><i class="bi bi-hdd-network icon"></i>网络</a></li>
+                
+                    <li class="dropdown">
+                        <a data-toggle="dropdown"><i class="bi bi-incognito" style="position:relative;top:1px;margin-right:3px;font-size:1.2rem;vertical-align:top;"></i>主题<b class="caret"></b></a>
+                        <ul class="dropdown-menu">
+                            <li v-for="(item, index) in adaptedTemplates" :key="index">
+                                <a @click="toggleTemplate(item.key)">
+                                    <i :class="item.icon + ' icon'" style="font-size:1em"></i>@#item.name#@
+                                    <i class="check icon" v-if="preferredTemplate === item.key"></i>
+                                </a>
+                            </li>
+                            <li v-if="defaultTemplate === 'custom'">
+                                <a @click="toggleTemplate('custom')" class="item">
+                                    <i class="expand icon" style="font-size:1em"></i>Custom
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+            </ul>
+        </nav>
+    </div>
+</header>
+<section class="nezha">
+
+<div class="container-fluid content network-box">
+    <div class="network-box-header btn-group">
+        <div class="dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <i class="bi bi-list-ul"></i> 网络监控 <i class="bi bi-chevron-compact-down"></i>
+        </div>
+        <ul class="dropdown-menu">
+            <li class="input-group fixed-top">
+                <input type="text" id="dropdown-search" class="form-control" placeholder="Search...">
+            </li>
+            <li class="dropdown-item" v-for="server in servers" @click="showCharts(server.ID)">
+                <a><i :class="'fi fi-' + (server.Host.CountryCode || 'un')"></i> @#server.Name#@ <i v-if="server.ID == currentServerId" class="check icon"></i></a>
+            </li>
+        </ul>
+    </div>
+    <div v-if="chartTitle" class="chartTitle" @click="showCharts(nextServerId)"><i class="chartCountryCode" :class="'fi fi-' + chartCountryCode"></i> @#chartTitle#@</div>
+    <div id="chartbox" style="width:100%;height:auto;"></div>
+</div>
+
+    </section>
+    <footer class="container-fluid">
+        <p><span data-nz="brand">云监控</span> | Theme ServerStatus | Powered by <a target="_blank" href="https://github.com/naiba/nezha">哪吒监控</a> <span data-nz="version"></span></p>
+    </footer>
+    <aside class="toolbox">
+        <template v-if="showTools">
+            <span v-if="page=='index' && countryMapChartData.length!=0" class="showMapChart">
+                <i @click="showMapChart" data-toggle="modal" data-target="#mapChartBox" class="bi bi-geo-alt"></i>
+            </span>
+            <span class="toggleView">
+                <i v-if="showGroup" @click="toggleShowGroup" class="show-nogroup bi bi-justify"></i>
+                <i v-else @click="toggleShowGroup" class="show-group bi bi-view-stacked"></i>
+            </span>
+            <span class="toggleSemiTransparent" @click="toggleSemiTransparent">
+                <i class="bi" :class="semiTransparent ? 'bi-droplet' : 'bi-droplet-half'"></i>
+            </span>
+        </template>
+           <span v-if="!showTools">
+            <i @click="toggleShowTools" class="bi bi-three-dots"></i>
+        </span>
+        <span class="setTheme">
+            <i v-if="theme === 'light'" @click="setTheme('dark')" class="setTheme-dark bi bi-moon-fill"></i>
+            <i v-else @click="setTheme('light')" class="setTheme-light bi bi-brightness-high-fill"></i>
+        </span>
+        <span v-if="showGoTop" class="showGoTop">
+            <i @click="goTop" class="goTop bi bi-arrow-up"></i>
+        </span>
+    </aside>
+    <template v-if="semiTransparent">
+        <link rel="stylesheet" href="/static/theme-server-status/css/light.plus.css?v20241103">
+    	<link rel="stylesheet" href="/static/theme-server-status/css/dark.plus.css?v20241103"> 
+    </template>
+</div>
+
+</body>
+</html>
+
+<script>
+nzBoot(function (nzInitServers) {
+    new Vue({
+        el: '#app',
+        delimiters: ['@#', '#@'],
+        data: {
+            page: 'network',
+            defaultTemplate: "server-status",
+            templates: {"default": "默认", "server-status": "ServerStatus"},
+            servers: [],
+            chartDataList: [],
+            chartTitle: '',
+            chartCountryCode: '',
+            chart: null,
+            currentServerId: '',
+            nextServerId: '',
+        },
+        mixins: [mixinsVue],
+        created() {
+            this.servers = nzInitServers;
+            if (this.servers.length) this.showCharts(this.servers[0].ID);
+        },
+        mounted() {
+            this.initSearch();            
+        },
+        methods: {
+            showCharts(id) {
+                // 发起数据请求
+                nzMonitor(id)
+                    .then(data => {
+                        if (data.result && data.result.length) { // 数据请求成功，更新数据并渲染图表
+                            this.chartDataList[id] = data.result;
+                            this.$nextTick(() => {
+                                this.renderCharts(id);
+                            });
+                        } else {
+                            console.log('this server (id:'+ id + ') has no monitor.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                    });
+            },
+            renderCharts(id, reload = false) {
+                if(!this.chartDataList[id]) return;
+                if(this.chart) this.disposeCharts(this.chart);
+                this.currentServerId = id;
+                this.nextServerId = this.getNextServerId(id);
+                this.chartCountryCode = this.getServerCountryCode(id);
+                this.chartTitle = this.chartDataList[id][0].server_name;
+                const chartData = this.chartDataList[id];
+                const chartContainer = document.getElementById('chartbox');
+                const MaxTCPPingValue = 1000 ? 1000 : 300;
+                const autoheight = this.isMobile ? (window.innerHeight - 180) : (window.innerHeight - 250);
+                const fontSize = this.isMobile ? 10 : 14;
+                const gridLeft = (MaxTCPPingValue > 500) ? (this.isMobile ? 36 : 42) : (this.isMobile ? 30 : 36);
+                const gridRight = this.isMobile ? 12 : 20;
+                const legendLeft = this.isMobile ? 'center' : 'center';
+                const legendTop = this.isMobile ? 5 : 5;
+                const legendPadding= this.isMobile ? [5,0,5,0] : [5,0,5,0];
+                const fontColor = this.theme == "dark" ? "#f1f1f1" : "#000000";
+                const chartTheme = this.theme == "dark" ? "dark" : "default";
+                const backgroundColor = this.theme == "dark" ? '' : '';
+                const tooltipBackgroundColor = this.theme == "dark" ? (this.semiTransparent ? "rgba(28,29,38,0.85)" : "rgba(28,29,38,1)") : (this.semiTransparent ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,1)");
+                const tooltipBorderColor = this.theme == "dark" ? (this.semiTransparent ? "rgba(28,29,38,0.9)" : "rgba(28,29,38,1)") : (this.semiTransparent ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,1)");
+                const lineStyleWidth = this.isMobile ? 1 : 2;
+                const splitLineWidth = this.isMobile ? 0.5 : 1;
+                const markPointSymbolSize = this.isMobile ? 36 : 42;
+                const markPointItemStyleOpacity = this.semiTransparent ? 1 : 1;
+                const markPointFontSize = this.isMobile ? 8 : 10;
+                const markLineItemStyleOpacity = this.semiTransparent ? 1 : 0.75;
+                const markLineLineStyleWidth = this.isMobile ? 0.15 : 0.3;
+                const showLoadingMaskColor = this.theme == "dark" ? 'rgba(0, 0, 0, 0)' : 'rgba(255, 255, 255, 0)';
+                const showLoadingTextColor = this.theme == "dark" ? 'rgba(241, 241, 241, 1)' : 'rgba(0, 0, 0, 1)';
+                const showLoadingColor = this.theme == "dark" ? '#D2B206' : '#FFDF32';
+                this.chart = echarts.init(chartContainer, chartTheme, { // init图表
+                    renderer: 'canvas',
+                    useDirtyRect: false,
+                    width: 'auto',
+                    height: autoheight,
+                });
+                this.chart.showLoading({
+                    text: 'loading',
+                    textColor: showLoadingTextColor,
+                    color: showLoadingColor,
+                    maskColor: showLoadingMaskColor,
+                    zlevel: 2
+                });
+                let legendData = [];
+                let seriesData = [];
+                chartData.forEach((item,key)=> {
+                    let loss = 0;
+                    let totalLossRate = 0;
+                    let legendName = '';
+                    let data = { main: [], markLine: []};
+                    item.avg_delay.forEach((avgDelay, index) => {
+                        const threshold = 0.9 * MaxTCPPingValue; // 定义阀值,用于判断是否丢包
+                        // 定义丢包 1. avgDelay==0  2. avgDelay>=MaxTCPPingValue 3. avgDelay>=threshold
+                        if(avgDelay == 0 || avgDelay >= MaxTCPPingValue){ //绝对丢包
+                            loss += 1;
+                            const lossrate = 100 * loss / (index + 1);
+                            if(lossrate != 100) {
+                                data['markLine'].push({
+                                    xAxis: item.created_at[index],
+                                    label: { show: false },
+                                    emphasis: { disabled: true },
+                                    lineStyle: { type: "solid" }
+                                });
+                            }
+                        } else if (avgDelay >= threshold && avgDelay < MaxTCPPingValue){ // 相对丢包
+                            loss += 1;
+                            const lossrate = 100 * loss / (index + 1);
+                            if(lossrate != 100) {
+                                data['main'].push(
+                                    [item.created_at[index], avgDelay, lossrate]
+                                );
+                                data['markLine'].push({
+                                    xAxis: item.created_at[index],
+                                    label: { show: false },
+                                    emphasis: { disabled: true },
+                                    lineStyle: { type: "solid" }
+                                });
+                            }
+                        } else { // 未丢包
+                            const lossrate = 100 * loss / (index + 1);
+                            data['main'].push(
+                                [item.created_at[index], avgDelay, lossrate]
+                            );
+                        }
+                    });
+                    totalLossRate = ((loss / item.created_at.length) * 100).toFixed(1);
+                    legendName = `${item.monitor_name} ${totalLossRate}%`;
+                    legendData.push(legendName);
+                    seriesData.push(
+                        {
+                            name: legendName,
+                            type: 'line',
+                            smooth: true,
+                            symbol: 'none',
+                            connectNulls: true,
+                            legendHoverLink: false,
+                            emphasis: {
+                                disabled: true
+                            },
+                            lineStyle: {
+                                width: lineStyleWidth
+                            },  
+                            data: data['main'],
+                            markLine: {
+                                symbol: "none",
+                                symbolSize :0,
+                                data: data['markLine'],
+                                itemStyle: { 
+                                    opacity: markLineItemStyleOpacity
+                                },
+                                lineStyle:{
+                                    width: markLineLineStyleWidth
+                                }
+                            },
+                            markPoint: {
+                                data: [
+                                    { 
+                                        name: 'Max',
+                                        type: 'max', 
+                                        symbol: 'pin', 
+                                        itemStyle: { 
+                                            opacity: markPointItemStyleOpacity
+                                        }, 
+                                        symbolSize: markPointSymbolSize, 
+                                        label: { 
+                                            fontSize: markPointFontSize,
+                                            formatter: function (params) {
+                                                return Math.round(params.value);
+                                            }
+                                        }
+                                    },
+                                    {
+                                        name: 'Min',
+                                        type: 'min', 
+                                        symbol: 'pin', 
+                                        itemStyle: { 
+                                            opacity: markPointItemStyleOpacity
+                                        }, 
+                                        symbolSize: markPointSymbolSize, 
+                                        label: { 
+                                            fontSize: markPointFontSize,
+                                            offset: [0, 8],
+                                            formatter: function (params) {
+                                                return Math.round(params.value);
+                                            }
+                                        }, 
+                                        symbolRotate: 180 
+                                    }
+                                ]
+                            }
+                        }
+                    );
+                });
+                const maxLegendsPerRowMobile = localStorage.getItem("maxLegendsPerRowMobile") ? localStorage.getItem("maxLegendsPerRowMobile") : 3;
+                const maxLegendsPerRowPc = localStorage.getItem("maxLegendsPerRowPc") ? localStorage.getItem("maxLegendsPerRowPc") : 6;
+                const autoIncrement = Math.floor((legendData.length - 1) / (this.isMobile ? maxLegendsPerRowMobile : maxLegendsPerRowPc)) * (this.isMobile ? 20 : 28);
+                const height = autoheight + autoIncrement;
+                const gridTop = this.isMobile ? ( 60 + autoIncrement) : (80 + autoIncrement);
+                const gridBottom = this.isMobile ? 70 : 90;
+                const legendIcon = this.isMobile ? 'rect' : ""; 
+                const itemWidth = this.isMobile ? 10 : 25;
+                const itemHeight = this.isMobile ? 10 : 14;
+                this.chart.resize({
+                    width: 'auto',
+                    height: height
+                });
+                // 设置图表配置项
+                const option = {
+                    color: this.colors,
+                    backgroundColor: backgroundColor,
+                    textStyle: {
+                        fontSize: fontSize,
+                        color: fontColor
+                    },
+                    grid: {
+                        top: gridTop,
+                        left: gridLeft,
+                        right: gridRight,
+                        bottom: gridBottom
+                    },
+                    title: {
+                        show: false,
+                    },
+                    series: seriesData.flat(),
+                    xAxis: {
+                        type: 'time',
+                        axisLabel: {
+                            textStyle: {
+                                fontSize: fontSize
+                            }
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        axisLabel: {
+                            textStyle: {
+                                fontSize: fontSize
+                            }
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                width: splitLineWidth
+                            }
+                        }
+                    },
+                    legend: {
+                        data: legendData,
+                        show: true,
+                        icon: legendIcon,
+                        textStyle: {
+                            fontSize: fontSize,
+                            color: fontColor
+                        },
+                        top: legendTop,
+                        bottom: 0,
+                        left: legendLeft,
+                        padding: legendPadding,
+                        itemWidth: itemWidth,
+                        itemHeight: itemHeight,
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        backgroundColor: tooltipBackgroundColor,
+                        borderColor: tooltipBorderColor,
+                        textStyle: {
+                            fontSize: fontSize,
+                            color: fontColor
+                        },
+                        formatter: function (params) {
+                            let tooltipContent = '';
+                            const formattedTime = new Date(params[0].value[0]).toLocaleString(); 
+                            tooltipContent += `<span style="line-height:2em">${formattedTime}</span><br>`;
+                            params.forEach(param => {
+                                const formattedTime = new Date(param.value[0]).toLocaleString();
+                                if (!param.seriesName.includes('stack')) {
+                                    const name = param.seriesName.replace(/\s\d+(\.\d+)?%$/, '');
+                                    tooltipContent += `<span style="line-height:2em">${param.marker} ${name} ${param.value[2].toFixed(1)}% ${param.value[1].toFixed(2)}</span><br>`;
+                                }
+                            });
+                            return tooltipContent;
+                        }
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            start: 0,
+                            end: 100
+                        }
+                    ]
+                };
+                setTimeout(() => {
+                    this.chart.hideLoading();
+                    this.chart.setOption(option);
+                }, 1000);
+            },
+            reloadCharts() {
+                const chartData = this.chartDataList[this.currentServerId];
+                if (chartData) {
+                    this.renderCharts(this.currentServerId,true);
+                }
+            },
+            disposeCharts(chart){
+                chart.dispose();
+                chart = null;
+            },
+            getServerCountryCode(id){
+                const result = this.servers.find(item => item.ID == id);
+                return result.Host.CountryCode ? result.Host.CountryCode : 'un';
+            },
+            getNextServerId(id) {
+                const currentIndex = this.servers.findIndex(item => item.ID === id);
+                if (currentIndex === -1) {
+                    return this.servers[0].ID;
+                }
+                // 判断是否有下一个元素
+                const nextIndex = currentIndex + 1;
+                // 如果有下一个元素，返回下一个元素的 ID；否则返回第一个元素的 ID
+                return nextIndex < this.servers.length ? this.servers[nextIndex].ID : this.servers[0].ID;
+            },
+            initSearch() {
+                $('#dropdown-search').on('keyup', function() {
+                    var searchTerm = $(this).val().toLowerCase();
+                    $('.dropdown-menu .dropdown-item').each(function() {
+                        var text = $(this).text().toLowerCase();
+                        if (text.indexOf(searchTerm) > -1) {
+                            $(this).removeClass('hidden').addClass('visible'); // 显示元素
+                        } else {
+                            $(this).removeClass('visible').addClass('hidden'); // 隐藏元素
+                        }
+                    });
+                });
+            }
+        }
+    });
+});
+</script>

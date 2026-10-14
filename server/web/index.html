@@ -56,6 +56,20 @@
         <template v-else>
             <a href="/network" class="item"><i class="bi bi-hdd-network icon"></i>网络</a>
         </template>
+                
+            <div class="item ui dropdown" :class="{ simple: !isMobile }">
+                <div class="text"><i class="bi bi-incognito icon" style="margin-right:3px;"></i>主题<i class="dropdown icon" style="margin-right:0px;"></i></div>
+                <div class="menu"> 
+                    <a v-for="(item, index) in adaptedTemplates" :key="index" @click="toggleTemplate(item.key)" class="item">
+                        <i :class="item.icon + ' icon'"></i>@#item.name#@
+                        <i class="check icon" v-if="preferredTemplate === item.key"></i>
+                    </a>
+                    <a v-if="defaultTemplate === 'custom'" @click="toggleTemplate('custom')" class="item">
+                        <i class="expand icon"></i>Custom
+                    </a>
+                </div>
+            </div>
+        
     </div>
 </div>
 
@@ -222,11 +236,15 @@
 </div>
 <div class="ui inverted vertical footer segment">
     <div class="ui center aligned is-size-7 container">
-        <b>&copy; <a id="nzBrand" style="color: white;" href="/">云监控</a></b> | <small>Powered by <a
+        <b>&copy; <a style="color: white;" href="/"><span data-nz="brand">云监控</span></a></b> | <small>Powered by <a
                 href="https://github.com/naiba/nezha" style="color: white;" target="_blank">哪吒监控</a>
-            <span id="nzVersion"></span></small>
+            <span data-nz="version"></span></small>
     </div>
 </div>
+
+
+</body>
+</html>
 
 <script>
 nzBoot(function (nzInitServers) {
@@ -236,7 +254,7 @@ nzBoot(function (nzInitServers) {
         data: {
             page: 'index',
             defaultTemplate: "default",
-            templates: {"default": "默认"},
+            templates: {"default": "默认", "server-status": "ServerStatus"},
             servers: [],
             groups: [],
             cache: [],
@@ -698,5 +716,3 @@ nzBoot(function (nzInitServers) {
     $('.ui.accordion').accordion({ "exclusive": false });
 });
 </script>
-</body>
-</html>
