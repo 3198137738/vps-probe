@@ -111,8 +111,8 @@
             <span class="toggleSemiTransparent" @click="toggleSemiTransparent">
                 <i class="bi" :class="semiTransparent ? 'bi-droplet' : 'bi-droplet-half'"></i>
             </span>
-            <span v-if="semiTransparent" class="setBackground" title="更换背景图片">
-                <i onclick="nzUploadBackground()" class="bi bi-image"></i>
+            <span v-if="semiTransparent" class="setBackground" title="背景设置">
+                <i onclick="nzUploadBackground(event)" class="bi bi-image"></i>
             </span>
         </template>
            <span v-if="!showTools">

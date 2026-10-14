@@ -686,13 +686,14 @@ show_info() {
 }
 
 set_background() {
-  # 设置网页背景：本地图片路径 / 图片网址 / - 恢复默认（通过主控接口上传，主控负责校验格式与大小）
+  # 设置网页背景：本地图片路径 / 图片网址 / - 恢复默认 / 0 无背景（通过主控接口上传，主控负责校验格式与大小）
   python3 - "$CONF" "$1" <<'PY'
 import json, sys, urllib.parse, urllib.request
 conf, src = sys.argv[1], sys.argv[2].strip()
 c = json.load(open(conf, encoding="utf-8"))
 data = b""
-if src != "-":
+mode = {"-": "default", "0": "none"}.get(src, "")
+if not mode:
     try:
         if src.startswith(("http://", "https://")):
             req = urllib.request.Request(src, headers={"User-Agent": "Mozilla/5.0"})
@@ -705,7 +706,7 @@ if src != "-":
     if not data:
         print("图片内容为空")
         sys.exit(1)
-q = urllib.parse.urlencode({"token": c["token"], "action": "background"})
+q = urllib.parse.urlencode({"token": c["token"], "action": "background", "mode": mode})
 url = "http://127.0.0.1:%s/api/admin?%s" % (c.get("http_port", 8080), q)
 try:
     req = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/octet-stream"})
@@ -725,7 +726,7 @@ menu_settings() {
     auto="$(cfg_get auto_update)"; agent_auto="$(cfg_get agent_auto_update)"
     sort="$(cfg_get sort)"; [ "$sort" = "manual" ] && sort="手动排序" || sort="按名称自动排序"
     theme="$(cfg_get web_theme)"; [ "$theme" = "default" ] && theme="默认" || theme="ServerStatus"
-    [ -f "$DIR/background" ] && bg="自定义图片" || bg="主题默认"
+    if [ -f "$DIR/background" ]; then bg="自定义图片"; elif [ -f "$DIR/background.none" ]; then bg="无背景"; else bg="主题默认"; fi
     echo
     echo " 1. 网页标题          [$(cfg_get title)]"
     echo " 2. 对外地址          [$(cfg_get public_host)]（用于生成节点安装命令）"
@@ -777,7 +778,7 @@ menu_settings() {
       15) v="$(ask "面板网址（如 https://tz.example.com，输入 - 清空）: " "$(cfg_get panel_url)")"
           [ "$v" = "-" ] && v=""; cfg_set panel_url "${v%/}" ;;
       16) [ "$(cfg_get web_theme)" = "default" ] && cfg_set web_theme server-status || cfg_set web_theme default; changed=1 ;;
-      17) v="$(ask "背景图片（本地路径或图片网址，JPG/PNG/WebP/GIF，10MB 以内；输入 - 恢复默认）: ")"
+      17) v="$(ask "背景图片（本地路径或图片网址，JPG/PNG/WebP/GIF，10MB 以内；输入 - 恢复默认，输入 0 无背景）: ")"
           [ -n "$v" ] && set_background "$v" ;;
       0|"") break ;;
     esac

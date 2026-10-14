@@ -148,13 +148,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 
 访客通过页面「主题」菜单切换主题（保存在浏览器 cookie `preferred_theme`），未选择时使用设置中的默认主题（`probe` →「修改设置」→「网页默认主题」，或配置项 `web_theme`），默认为 ServerStatus。
 
-**毛玻璃与背景图片**：ServerStatus 主题默认开启半透明模式（右下角工具栏的水滴按钮可切换），面板为毛玻璃效果（`server/web/static/glass.css`）。背景图片可自定义，任意尺寸都会自动铺满屏幕（居中裁切）：
+**毛玻璃与背景图片**：ServerStatus 主题默认开启半透明模式（右下角工具栏的水滴按钮可切换），面板为毛玻璃效果（`server/web/static/glass.css`）。背景可以是主题默认图片、自定义图片（任意尺寸都会自动铺满屏幕，居中裁切）或无背景（纯色），更换后所有已打开的页面 2 秒内自动生效：
 
-- 网页：右下角工具栏 →「更换背景」图标，选择图片上传（首次需输入主控 Token，保存在本浏览器）
-- 主控：`probe` →「修改设置」→「网页背景图片」，填本地图片路径或图片网址，输入 `-` 恢复默认
-- 接口：`curl -X POST --data-binary @bg.jpg "http://主控:8080/api/admin?token=TOKEN&action=background"`（请求体为空则恢复默认）
+- 网页：右下角工具栏 →「背景设置」图标 →「上传图片 / 恢复默认背景 / 无背景」（首次需输入主控 Token，保存在本浏览器）
+- 主控：`probe` →「修改设置」→「网页背景图片」，填本地图片路径或图片网址，输入 `-` 恢复默认，输入 `0` 无背景
+- 接口：`curl -X POST --data-binary @bg.jpg "http://主控:8080/api/admin?token=TOKEN&action=background"`；URL 加 `&mode=none` 为无背景，`&mode=default`（或请求体为空）恢复默认
 
-支持 JPG / PNG / WebP / GIF，10MB 以内，保存在 `/opt/probe-server/background`，更新主控不会覆盖。
+支持 JPG / PNG / WebP / GIF，10MB 以内，保存在 `/opt/probe-server/background`（无背景时为 `background.none` 标记文件），更新主控不会覆盖。
 
 ## 目录结构
 

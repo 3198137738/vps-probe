@@ -7,6 +7,7 @@
 - http_port ：提供网页与 /api/stats 接口（gzip 压缩）
 - 自动更新：定期检查 GitHub 仓库新提交，自动下载并重启；客户端连接时从主控获取新版 agent.py
 """
+import base64
 import gzip
 import hashlib
 import html
@@ -31,17 +32,20 @@ DATA_DIR = os.environ.get("PROBE_DATA", BASE_DIR)
 WEB_DIR = os.path.join(BASE_DIR, "web")
 THEMES = {"default": "/", "server-status": "/server-status/"}   # 主题 -> 页面所在目录
 BG_FILE = os.path.join(DATA_DIR, "background")   # 自定义网页背景图片（ServerStatus 主题半透明模式）
+BG_NONE = os.path.join(DATA_DIR, "background.none")   # 存在时表示「无背景」（纯色）
 BG_DEFAULT = os.path.join(WEB_DIR, "static", "theme-server-status", "img", "bg.jpg")
+# 无背景时 /background 返回 1x1 透明 GIF，页面显示主题底色
+BG_EMPTY = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
 BG_MAX = 10 * 1024 * 1024
 
 
 def background_version():
-    """背景图版本（自定义图片的修改时间与大小），变化时网页立即换图；未自定义为空"""
+    """背景图版本：自定义图片为修改时间与大小，无背景为 none，默认背景为空；变化时网页立即换图"""
     try:
         st = os.stat(BG_FILE)
         return "%x-%x" % (st.st_mtime_ns, st.st_size)
     except OSError:
-        return ""
+        return "none" if os.path.exists(BG_NONE) else ""
 
 
 def image_type(data):
@@ -695,7 +699,9 @@ class WebHandler(BaseHTTPRequestHandler):
         return CFG.get("web_theme") if CFG.get("web_theme") in THEMES else "server-status"
 
     def background(self):
-        """网页背景图：已上传自定义图片时返回该图片，否则返回主题自带背景"""
+        """网页背景图：自定义图片 > 无背景（透明图）> 主题自带背景"""
+        if not os.path.isfile(BG_FILE) and os.path.exists(BG_NONE):
+            return self.send(200, BG_EMPTY, "image/gif", "no-cache", None, '"bg-none"')
         full = BG_FILE if os.path.isfile(BG_FILE) else BG_DEFAULT
         try:
             st = os.stat(full)
@@ -712,14 +718,19 @@ class WebHandler(BaseHTTPRequestHandler):
             return
         self.send(200, data, image_type(data) or "image/jpeg", "no-cache", None, etag)
 
-    def set_background(self):
-        """上传背景图（请求体为图片文件）；请求体为空时恢复默认背景"""
+    def set_background(self, mode=""):
+        """上传背景图（请求体为图片文件）；mode=none 为无背景，请求体为空或 mode=default 恢复默认背景"""
         size = int(self.headers.get("Content-Length") or 0)
         if size > BG_MAX:
             return {"ok": 0, "msg": "图片不能超过 %dMB" % (BG_MAX // 1048576)}
-        if size == 0:
-            if os.path.exists(BG_FILE):
-                os.remove(BG_FILE)
+        if mode in ("none", "default") or size == 0:
+            for f in (BG_FILE, BG_NONE):
+                if os.path.exists(f):
+                    os.remove(f)
+            if mode == "none":
+                open(BG_NONE, "w").close()
+                log("网页背景已设为无背景")
+                return {"ok": 1, "msg": "已设为无背景"}
             log("网页背景已恢复默认")
             return {"ok": 1, "msg": "已恢复默认背景"}
         data = self.rfile.read(size)
@@ -729,6 +740,8 @@ class WebHandler(BaseHTTPRequestHandler):
         with open(tmp, "wb") as f:
             f.write(data)
         os.replace(tmp, BG_FILE)
+        if os.path.exists(BG_NONE):
+            os.remove(BG_NONE)
         log("网页背景已更新: %s, %dKB" % (image_type(data), size // 1024))
         return {"ok": 1, "msg": "背景已更新"}
 
@@ -778,7 +791,7 @@ class WebHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
         # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update|upgrade|refresh&id=..&name=..&order=..
-        # 网页背景：POST /api/admin?token=xxx&action=background，请求体为图片文件，为空则恢复默认
+        # 网页背景：POST /api/admin?token=xxx&action=background[&mode=none|default]，请求体为图片文件；mode=none 无背景，为空或 default 恢复默认
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
@@ -786,7 +799,7 @@ class WebHandler(BaseHTTPRequestHandler):
         if not secrets.compare_digest(q.get("token", ""), CFG["token"]):
             return self.send(403, b'{"ok":0,"msg":"token error"}')
         if q.get("action") == "background":
-            return self.send(200, json.dumps(self.set_background(), ensure_ascii=False).encode("utf-8"))
+            return self.send(200, json.dumps(self.set_background(q.get("mode", "")), ensure_ascii=False).encode("utf-8"))
         if url.path == "/api/delete":
             n = STORE.delete(q.get("name", ""))
             STORE.save()

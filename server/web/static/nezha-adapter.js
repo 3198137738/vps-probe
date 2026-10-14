@@ -112,7 +112,12 @@
             style.id = 'nzBackground';
             document.head.appendChild(style);
         }
-        style.textContent = 'html body[theme]::before{background-image:url(/background?v=' + encodeURIComponent(ver) + ') !important}';
+        style.textContent = ver === 'none'
+            // 无背景：显示与主题明暗对应的纯色
+            ? 'html body[theme]::before{background-image:none !important}' +
+              'html body[theme="light"]::before{background-color:#eef1f5 !important}' +
+              'html body[theme="dark"]::before{background-color:#14161d !important}'
+            : 'html body[theme]::before{background-image:url(/background?v=' + encodeURIComponent(ver) + ') !important}';
     }
 
     window.nzFetchStats = function () {
@@ -132,7 +137,7 @@
             }
             // 背景图在主控上更换后（网页、probe 或接口），所有已打开的页面立即换图
             if (data.bg !== undefined && data.bg !== lastBg) {
-                if (lastBg !== null) applyBackground(data.bg || 'default');
+                if (lastBg !== null || data.bg === 'none') applyBackground(data.bg || 'default');
                 lastBg = data.bg;
             }
             return convert(data);
@@ -253,8 +258,30 @@
         }
     } catch (e) {}
 
-    // 更换背景图片：选择图片后上传到主控（需主控 Token，首次输入后保存在本浏览器）
-    window.nzUploadBackground = function () {
+    // 背景设置（ServerStatus 主题工具栏按钮）：上传图片 / 恢复默认背景 / 无背景。需主控 Token，首次输入后保存在本浏览器
+    function backgroundRequest(mode, body) {
+        var token = localStorage.getItem('nzToken') || prompt('请输入主控 Token（在主控上运行 probe，选择「8. 查看 Token 与添加命令」）');
+        if (!token) return;
+        token = token.trim();
+        var q = 'action=background&token=' + encodeURIComponent(token) + (mode ? '&mode=' + mode : '');
+        fetch('/api/admin?' + q, { method: 'POST', body: body || '' })
+            .then(function (r) {
+                if (r.status === 403) throw new Error('Token 错误');
+                return r.json();
+            })
+            .then(function (d) {
+                if (!d.ok) throw new Error(d.msg || '操作失败');
+                localStorage.setItem('nzToken', token);
+                lastBg = mode === 'none' ? 'none' : (mode === 'default' ? '' : 't' + Date.now());
+                applyBackground(mode === 'none' ? 'none' : (mode === 'default' ? 'default' : lastBg));
+            })
+            .catch(function (e) {
+                if (e.message === 'Token 错误') localStorage.removeItem('nzToken');
+                alert('背景设置失败：' + e.message);
+            });
+    }
+
+    function chooseImage() {
         var input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/jpeg,image/png,image/webp,image/gif';
@@ -262,23 +289,37 @@
             var file = input.files[0];
             if (!file) return;
             if (file.size > 10 * 1024 * 1024) return alert('图片不能超过 10MB');
-            var token = localStorage.getItem('nzToken') || prompt('请输入主控 Token（在主控上运行 probe，选择「8. 查看 Token 与添加命令」）');
-            if (!token) return;
-            fetch('/api/admin?action=background&token=' + encodeURIComponent(token.trim()), { method: 'POST', body: file })
-                .then(function (r) {
-                    if (r.status === 403) throw new Error('Token 错误');
-                    return r.json();
-                })
-                .then(function (d) {
-                    if (!d.ok) throw new Error(d.msg || '上传失败');
-                    localStorage.setItem('nzToken', token.trim());
-                    applyBackground('t' + Date.now());
-                })
-                .catch(function (e) {
-                    if (e.message === 'Token 错误') localStorage.removeItem('nzToken');
-                    alert('更换背景失败：' + e.message);
-                });
+            backgroundRequest('', file);
         };
         input.click();
+    }
+
+    function closeBackgroundMenu(e) {
+        var m = document.getElementById('nzBgMenu');
+        if (e && m && m.contains(e.target)) return;   // 点击的是菜单项，由菜单项自己处理
+        if (m) m.remove();
+        document.removeEventListener('click', closeBackgroundMenu, true);
+    }
+
+    window.nzUploadBackground = function (ev) {
+        if (document.getElementById('nzBgMenu')) return closeBackgroundMenu();
+        var btn = (ev || window.event || {}).target;
+        var r = btn && btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: window.innerWidth - 60, top: window.innerHeight - 120 };
+        var menu = document.createElement('div');
+        menu.id = 'nzBgMenu';
+        menu.className = 'nz-bg-menu';
+        menu.style.right = Math.max(8, window.innerWidth - r.left + 8) + 'px';
+        menu.style.bottom = Math.max(8, window.innerHeight - r.bottom) + 'px';
+        [['bi-upload', '上传图片', chooseImage],
+         ['bi-arrow-counterclockwise', '恢复默认背景', function () { backgroundRequest('default'); }],
+         ['bi-slash-circle', '无背景', function () { backgroundRequest('none'); }]].forEach(function (it) {
+            var a = document.createElement('a');
+            a.innerHTML = '<i class="bi ' + it[0] + '"></i>' + it[1];
+            a.onclick = function (e) { e.stopPropagation(); closeBackgroundMenu(); it[2](); };
+            menu.appendChild(a);
+        });
+        document.body.appendChild(menu);
+        // 点击菜单以外的位置关闭
+        setTimeout(function () { document.addEventListener('click', closeBackgroundMenu, true); }, 0);
     };
 })();
