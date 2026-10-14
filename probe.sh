@@ -609,6 +609,13 @@ refresh_nodes() {
   fi
 }
 
+# 更新节点完成后输出最新的一键安装命令，新增节点直接复制即可
+show_updated_commands() {
+  echo
+  blue "最新一键安装命令（新增节点时复制到服务器上执行）："
+  show_commands
+}
+
 menu_upgrade() {
   need_installed || return 1
   echo
@@ -620,9 +627,9 @@ menu_upgrade() {
   echo " 6. 刷新单个节点信息"
   echo " 0. 返回"
   case "$(ask "请选择: ")" in
-    1) offer_server_update && upgrade_nodes ;;
-    2) offer_server_update && pick_node && upgrade_nodes "$PICK_ID" ;;
-    3) update_old_agents ;;
+    1) offer_server_update && upgrade_nodes && show_updated_commands ;;
+    2) offer_server_update && pick_node && upgrade_nodes "$PICK_ID" && show_updated_commands ;;
+    3) update_old_agents && show_updated_commands ;;
     4) pick_node && rename_node ;;
     5) refresh_nodes ;;
     6) pick_node && refresh_nodes "$PICK_ID" ;;
