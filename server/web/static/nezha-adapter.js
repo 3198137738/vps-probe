@@ -146,7 +146,11 @@
     // 模拟 /api/v1/monitor/{id}：三网 24 小时历史，每行 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，
     // 无数据为 -1；整格丢包（延迟 -1、丢包 >= 0）按哪吒的约定记为延迟 0
     window.nzMonitor = function (id) {
+        // 数据有缓存时也延后到下一轮事件循环返回（与原版网络请求的时序一致）：
+        // 主题在点击时请求图表数据，需等 Bootstrap 展开详情区后再绘制，否则图表宽度为 0
         return loadPing24h().then(function (d) {
+            return new Promise(function (resolve) { setTimeout(function () { resolve(d); }, 0); });
+        }).then(function (d) {
             var rows = (d.nodes || {})[hexOf[id]] || [];
             var lines = [['电信', 3], ['联通', 1], ['移动', 5]];
             var result = rows.length ? lines.map(function (ln, k) {
