@@ -207,7 +207,7 @@ if cmd in ("table", "ids", "summary", "old"):
             print("\033[%sm%s\033[0m" % (color, line))
         if any(n["online"] and not n.get("latest") for n in nodes):
             print("\n\033[33m提示：在线但显示「旧版」的节点可在主菜单「7. 更新节点」中立即更新；"
-                  "若更新后仍为旧版，说明其客户端过旧不支持自动更新，请选择其中的「SSH 重装旧版客户端」（节点 ID 不变）\033[0m")
+                  "若更新后仍为旧版，说明其客户端过旧不支持自动更新，更新时按提示通过 SSH 重装即可（节点 ID 不变）\033[0m")
 elif cmd in ("upgrade", "refresh"):
     # 通知节点立即更新客户端 / 重新检测信息（ID 或 all），输出已通知的节点 ID
     r = call(cmd, id=args[0] if args else "all")
@@ -236,7 +236,7 @@ else:
 PY
 }
 
-# 选择节点：结果写入 PICK_ID / PICK_NAME
+# 选择节点：结果写入 PICK_ID / PICK_NAME；参数为 all 时直接回车选择全部节点（PICK_ID=all）
 pick_node() {
   PICK_ID=""; PICK_NAME=""
   pyapi table || return 1
@@ -244,7 +244,12 @@ pick_node() {
   mapfile -t lines < <(pyapi ids)
   [ "${#lines[@]}" -gt 0 ] || return 1
   echo
-  n="$(ask "请输入节点序号（直接回车取消）: ")"
+  if [ "$1" = "all" ]; then
+    n="$(ask "请输入节点序号（直接回车为全部节点，0 取消）: ")"
+    [ -z "$n" ] && { PICK_ID="all"; PICK_NAME="全部节点"; return 0; }
+  else
+    n="$(ask "请输入节点序号（直接回车取消）: ")"
+  fi
   if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt "${#lines[@]}" ]; then
     echo "已取消"; return 1
   fi
@@ -563,12 +568,10 @@ upgrade_nodes() {
     pyapi wait "$n" "${ids[@]}" && green "节点更新完成，已自动生效"
   fi
   # 早期安装的客户端不支持自动更新，只能 SSH 重装
-  out="$(pyapi old)"
-  if [ -n "$out" ]; then
+  if [ -n "$(pyapi old)" ]; then
     echo
-    yellow "以下节点仍为旧版客户端（可能不支持自动更新）："
-    printf '%s\n' "$out" | while IFS=$'\t' read -r _ name ip; do echo "  - $name（$ip）"; done
-    yellow "可在「7. 更新节点 → 3. SSH 重装旧版客户端」中处理"
+    yellow "部分节点仍为旧版客户端（可能不支持自动更新）"
+    update_old_agents
   fi
 }
 
@@ -603,7 +606,7 @@ refresh_nodes() {
   out="$(pyapi refresh "${1:-all}")" || { yellow "$out"; return 1; }
   mapfile -t ids < <(printf '%s\n' "$out" | grep .)
   if [ "${#ids[@]}" -eq 0 ]; then
-    yellow "没有在线节点"
+    yellow "没有在线节点（离线节点在上线时自动检测）"
   else
     green "已通知 ${#ids[@]} 个节点重新检测，约 10 秒后面板显示新信息（位置与 IP 协议检测需联网，稍慢）"
   fi
@@ -616,24 +619,32 @@ show_updated_commands() {
   show_commands
 }
 
+# 更新节点：修改名称 → 刷新系统、位置、IP 协议、CPU、容量等信息 → 更新客户端到最新版 → 显示一键安装命令
 menu_upgrade() {
   need_installed || return 1
+  pick_node all || return 0
+  local name="" r
+  if [ "$PICK_ID" != "all" ]; then
+    name="$(ask "节点名称（直接回车保持「$PICK_NAME」）: " "$PICK_NAME")"
+  fi
+  offer_server_update || return 1
   echo
-  echo " 1. 更新全部节点客户端（只更新客户端不是最新版的在线节点）"
-  echo " 2. 选择单个节点更新客户端"
-  echo " 3. SSH 重装旧版客户端（早期安装、不支持自动更新的节点）"
-  echo " 4. 修改节点名称（同步到节点本地配置）"
-  echo " 5. 刷新全部节点信息（立即重新检测系统、位置、IP 协议、CPU、容量等）"
-  echo " 6. 刷新单个节点信息"
-  echo " 0. 返回"
-  case "$(ask "请选择: ")" in
-    1) offer_server_update && upgrade_nodes && show_updated_commands ;;
-    2) offer_server_update && pick_node && upgrade_nodes "$PICK_ID" && show_updated_commands ;;
-    3) update_old_agents && show_updated_commands ;;
-    4) pick_node && rename_node ;;
-    5) refresh_nodes ;;
-    6) pick_node && refresh_nodes "$PICK_ID" ;;
-  esac
+  blue "==== 1/3 更新名称 ===="
+  if [ -z "$name" ]; then
+    echo "全部节点：保持原名称（单个节点可修改）"
+  elif [ "$name" = "$PICK_NAME" ]; then
+    echo "名称未变化：$name"
+  else
+    r="$(pyapi rename id="$PICK_ID" name="$name")"
+    [ "$r" = "ok" ] && green "已改名为「$name」，面板即时生效，并同步写入节点本地配置" || red "$r"
+  fi
+  echo
+  blue "==== 2/3 刷新节点信息（系统、位置、IP 协议、CPU、容量等） ===="
+  refresh_nodes "$PICK_ID"
+  echo
+  blue "==== 3/3 更新客户端到最新版 ===="
+  upgrade_nodes "$PICK_ID"
+  show_updated_commands
 }
 
 menu_add() {
@@ -919,7 +930,7 @@ usage() {
   add          添加节点
   del          删除节点
   edit         编辑节点
-  upgrade      更新节点客户端（立即生效）
+  upgrade      更新节点（名称、信息、客户端，立即生效）
   info         查看 Token 与添加命令
   set          修改设置
   restart      重启主控
