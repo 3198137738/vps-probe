@@ -1124,15 +1124,24 @@ nzBoot(function (nzInitServers) {
                     const isAriaExpandedFalse = collapseContainer.getAttribute('aria-expanded') === 'false';
                     if (!isAriaExpandedFalse) return;
                 }
+                // 本处理函数先于 Bootstrap 执行：先给图表占好高度，展开动画才会一次展开到位，不会在结束后再被图表撑高
+                chartContainer.style.minHeight = '300px';
+                // 等展开动画结束再绘制，避免绘图与动画抢主线程造成卡顿
+                const collapse = $('#rt' + id);
+                const shown = new Promise(resolve => {
+                    if (collapse.hasClass('in') && !collapse.hasClass('collapsing')) resolve();
+                    else collapse.one('shown.bs.collapse', () => resolve());
+                });
                 // 发起数据请求
-                nzMonitor(id)
-                    .then(data => {
+                Promise.all([nzMonitor(id), shown])
+                    .then(([data]) => {
                         if (data.result && data.result.length) { // 数据请求成功，更新数据并渲染图表
                             this.chartDataList[id] = data.result;
                             this.$nextTick(() => {
                                 this.renderCharts(id);
                             });
                         } else {
+                            chartContainer.style.minHeight = '';
                             console.log('this server (id:'+ id + ') has no monitor.');
                         }
                     })
