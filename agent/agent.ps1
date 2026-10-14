@@ -209,42 +209,65 @@ function Save-State {
 
 # ---------------------------------------------------------------- 三网延迟 / 丢包
 
-$script:PingTargets = @{}; $script:PingInterval = 60; $script:PingWindow = 10
-$script:PingData = @{}; $script:PingNext = @{}
+$script:PingWindow = 10
+# 与后台探测线程共享：targets 探测目标、interval 间隔（秒）、data 每个目标最近一个窗口的结果（-1 为失败）
+$script:PingShared = [hashtable]::Synchronized(@{ targets = @{}; interval = 60; window = 10; data = [hashtable]::Synchronized(@{}) })
+$script:PingPs = $null
 
 function Set-PingConfig($p, $pi, $pw) {
     if ($p) {
         $t = @{}
         foreach ($prop in $p.PSObject.Properties) { $t[$prop.Name] = [string]$prop.Value }
-        $script:PingTargets = $t
+        $script:PingShared.targets = $t
     }
-    if ($pi) { $script:PingInterval = [Math]::Max(5, [int]$pi) }
+    if ($pi) { $script:PingShared.interval = [Math]::Max(5, [int]$pi) }
     if ($pw) {
         $w = [Math]::Max(5, [int]$pw)
-        if ($w -ne $script:PingWindow) { $script:PingWindow = $w; $script:PingData = @{} }
+        if ($w -ne $script:PingWindow) {
+            $script:PingWindow = $w
+            $script:PingShared.window = $w
+            $script:PingShared.data = [hashtable]::Synchronized(@{})
+        }
     }
 }
 
-# 每轮最多探测一个到期目标（超时 1 秒），避免阻塞上报
-function Invoke-PingStep {
-    $now = Get-Date
-    foreach ($k in 'cu', 'ct', 'cm') {
-        if (-not $script:PingTargets.ContainsKey($k)) { continue }
-        if ($script:PingNext.ContainsKey($k) -and $script:PingNext[$k] -gt $now) { continue }
-        $script:PingNext[$k] = $now.AddSeconds($script:PingInterval)
-        $ms = Test-TcpMs $script:PingTargets[$k] 1000
-        if (-not $script:PingData.ContainsKey($k)) { $script:PingData[$k] = New-Object 'System.Collections.Generic.List[double]' }
-        $l = $script:PingData[$k]
-        $l.Add($ms)
-        while ($l.Count -gt $script:PingWindow) { $l.RemoveAt(0) }
-        break
+# 后台探测线程：超时 10 秒（与哪吒一致），握手包重发的等待计入延迟，曲线上表现为高延迟尖峰；
+# 在独立的运行空间中执行，握手慢时不会阻塞上报
+$script:PingWorker = {
+    param($shared, $tcpDef)
+    $tcping = [scriptblock]::Create($tcpDef)
+    $next = @{}
+    while ($true) {
+        foreach ($k in 'cu', 'ct', 'cm') {
+            $targets = $shared.targets
+            if (-not $targets.ContainsKey($k)) { continue }
+            if ($next.ContainsKey($k) -and $next[$k] -gt (Get-Date)) { continue }
+            $next[$k] = (Get-Date).AddSeconds($shared.interval)
+            $ms = & $tcping $targets[$k] 10000
+            $data = $shared.data
+            $l = @()
+            if ($data.ContainsKey($k)) { $l = $data[$k] }
+            $l = @($l) + $ms
+            $w = $shared.window
+            if ($l.Count -gt $w) { $l = $l[($l.Count - $w)..($l.Count - 1)] }
+            $data[$k] = $l
+        }
+        Start-Sleep -Milliseconds 500
     }
+}
+
+# 确保后台探测线程在运行（异常退出时重新启动）
+function Invoke-PingStep {
+    if ($script:PingPs -and $script:PingPs.InvocationStateInfo.State -eq 'Running') { return }
+    if ($script:PingPs) { $script:PingPs.Dispose() }
+    $script:PingPs = [powershell]::Create().AddScript($script:PingWorker).AddArgument($script:PingShared).AddArgument([string]${function:Test-TcpMs})
+    $null = $script:PingPs.BeginInvoke()
 }
 
 # 返回 [延迟ms, 丢包率%]，无数据时延迟为 -1
 function Get-PingResult([string]$k) {
-    if (-not $script:PingData.ContainsKey($k) -or $script:PingData[$k].Count -eq 0) { return @(-1, 0) }
-    $l = $script:PingData[$k]
+    $l = $script:PingShared.data[$k]
+    if (-not $l -or $l.Count -eq 0) { return @(-1, 0) }
     $ok = @($l | Where-Object { $_ -ge 0 })
     $loss = [int][Math]::Round(($l.Count - $ok.Count) * 100 / $l.Count)
     if ($ok.Count -eq 0) { return @(-1, $loss) }

@@ -352,8 +352,9 @@ class Pinger:
             threading.Thread(target=self.loop, daemon=True).start()
 
     @staticmethod
-    def tcping(target, timeout=1):
-        # 超时取 1 秒：系统会在 1 秒后重发丢失的 SYN，超时过长会把丢包误判为高延迟
+    def tcping(target, timeout=10):
+        # 超时取 10 秒（与哪吒一致）：握手包丢失后系统会在 1 秒、3 秒……后重发，这段等待计入延迟，
+        # 曲线上表现为高延迟尖峰；10 秒内都连不上才算丢包
         host, _, port = target.rpartition(":")
         host = host.strip("[]")
         try:
@@ -376,6 +377,7 @@ class Pinger:
             with self.lock:
                 targets = list(self.targets.items())
                 interval = self.interval
+            start = time.time()
             for key, target in targets:
                 ms = self.tcping(target)
                 with self.lock:
@@ -383,7 +385,8 @@ class Pinger:
                     if q is None or q.maxlen != self.window:
                         q = self.data[key] = deque(maxlen=self.window)
                     q.append(ms)
-            time.sleep(interval)
+            # 扣除本轮探测耗时，握手慢时也保持固定的探测间隔
+            time.sleep(max(1, interval - (time.time() - start)))
 
     def result(self, key):
         """返回 [延迟ms, 丢包率%]，无数据时延迟为 -1"""
