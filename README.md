@@ -1,6 +1,6 @@
 # 云监控探针
 
-轻量级 VPS 探针，前端采用哪吒监控 v0 主题（默认 / ServerStatus，页面「主题」菜单可切换）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
+轻量级 VPS 探针，前端采用哪吒监控 v0 主题（默认为 ServerStatus 主题 + 毛玻璃效果，可自定义背景图片；页面「主题」菜单可切换到默认主题）。服务端与客户端均**只依赖 Python3 标准库**，无需 pip、无需数据库。
 
 监控项全部自动识别：协议(IPv4/IPv6/双栈)、月流量、虚拟化、位置(国旗)、在线时长、负载、实时网速、总流量、CPU、内存、硬盘、三网(CU/CT/CM)延迟与丢包。点击节点名右侧的信息图标可查看详情（系统、CPU、硬盘、内存、交换、流量、负载、进程数、连接数、启动时间与三网 24 小时延迟图），「网络」页可查看各节点三网延迟曲线。
 
@@ -97,7 +97,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
 | `title` | 云监控 | 页面标题 |
-| `theme` | default | 网页默认主题：`default` / `server-status` |
+| `web_theme` | server-status | 网页默认主题：`server-status` / `default` |
 | `http_port` / `agent_port` | 8080 / 35688 | 网页端口 / 上报端口 |
 | `interval` | 3 | 客户端上报间隔（秒），下发给所有客户端 |
 | `offline_timeout` | 15 | 超过多少秒无数据判为离线 |
@@ -146,7 +146,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/3198137738/vps-probe/main/un
 
 `server/web/static/nezha-adapter.js` 负责把 `/json/stats.json`、`/json/ping24h.json` 转换为哪吒的数据格式，并以每 2 秒拉取一次代替原版的 WebSocket。节点弹窗中的延迟图与「网络」页使用三网 24 小时历史。本项目没有服务监控与后台，菜单中不显示「服务」「登录」。
 
-访客通过页面「主题」菜单切换主题（保存在浏览器 cookie `preferred_theme`），未选择时使用设置中的默认主题（`probe` →「修改设置」→「网页默认主题」，或配置项 `theme`）。
+访客通过页面「主题」菜单切换主题（保存在浏览器 cookie `preferred_theme`），未选择时使用设置中的默认主题（`probe` →「修改设置」→「网页默认主题」，或配置项 `web_theme`），默认为 ServerStatus。
+
+**毛玻璃与背景图片**：ServerStatus 主题默认开启半透明模式（右下角工具栏的水滴按钮可切换），面板为毛玻璃效果（`server/web/static/glass.css`）。背景图片可自定义，任意尺寸都会自动铺满屏幕（居中裁切）：
+
+- 网页：右下角工具栏 →「更换背景」图标，选择图片上传（首次需输入主控 Token，保存在本浏览器）
+- 主控：`probe` →「修改设置」→「网页背景图片」，填本地图片路径或图片网址，输入 `-` 恢复默认
+- 接口：`curl -X POST --data-binary @bg.jpg "http://主控:8080/api/admin?token=TOKEN&action=background"`（请求体为空则恢复默认）
+
+支持 JPG / PNG / WebP / GIF，10MB 以内，保存在 `/opt/probe-server/background`，更新主控不会覆盖。
 
 ## 目录结构
 

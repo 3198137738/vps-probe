@@ -30,6 +30,24 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("PROBE_DATA", BASE_DIR)
 WEB_DIR = os.path.join(BASE_DIR, "web")
 THEMES = {"default": "/", "server-status": "/server-status/"}   # 主题 -> 页面所在目录
+BG_FILE = os.path.join(DATA_DIR, "background")   # 自定义网页背景图片（ServerStatus 主题半透明模式）
+BG_DEFAULT = os.path.join(WEB_DIR, "static", "theme-server-status", "img", "bg.jpg")
+BG_MAX = 10 * 1024 * 1024
+
+
+def image_type(data):
+    """按文件头识别图片格式，非图片返回 None"""
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    return None
+
+
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
@@ -41,7 +59,7 @@ VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
     "title": "云监控",
-    "theme": "default",          # 网页默认主题：default / server-status（访客可在页面「主题」菜单中切换）
+    "web_theme": "server-status",  # 网页默认主题：server-status / default（访客可在页面「主题」菜单中切换）
     "http_port": 8080,
     "agent_port": 35688,
     "token": "",
@@ -79,6 +97,7 @@ def load_config():
             cfg.update(json.load(f))
     if not cfg.get("token"):
         cfg["token"] = secrets.token_hex(16)
+    cfg.pop("theme", None)            # 旧版的默认主题配置项，已改为 web_theme
     if cfg.get("ping") == OLD_PING:   # 仍是旧版默认目标的自动换成新默认目标
         cfg["ping"] = dict(DEFAULT_CONFIG["ping"])
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -625,6 +644,8 @@ class WebHandler(BaseHTTPRequestHandler):
         if url.path == "/json/ping24h.json":
             body, gz = STORE.history()
             return self.send(200, body, gz=gz)
+        if url.path == "/background":
+            return self.background()
         path = "/index.html" if url.path == "/" else url.path
         if path in ("/index.html", "/network", "/network.html"):
             # 首页与网络页按主题返回：浏览器选择的主题（cookie）优先，否则用设置中的默认主题
@@ -661,7 +682,45 @@ class WebHandler(BaseHTTPRequestHandler):
         cookie = re.search(r"(?:^|;)\s*preferred_theme=([\w-]+)", self.headers.get("Cookie", ""))
         if cookie and cookie.group(1) in THEMES:
             return cookie.group(1)
-        return CFG.get("theme") if CFG.get("theme") in THEMES else "default"
+        return CFG.get("web_theme") if CFG.get("web_theme") in THEMES else "server-status"
+
+    def background(self):
+        """网页背景图：已上传自定义图片时返回该图片，否则返回主题自带背景"""
+        full = BG_FILE if os.path.isfile(BG_FILE) else BG_DEFAULT
+        try:
+            st = os.stat(full)
+            with open(full, "rb") as f:
+                data = f.read()
+        except OSError:
+            return self.send(404, b"not found", "text/plain")
+        etag = '"bg-%x-%x"' % (int(st.st_mtime), st.st_size)
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        self.send(200, data, image_type(data) or "image/jpeg", "no-cache", None, etag)
+
+    def set_background(self):
+        """上传背景图（请求体为图片文件）；请求体为空时恢复默认背景"""
+        size = int(self.headers.get("Content-Length") or 0)
+        if size > BG_MAX:
+            return {"ok": 0, "msg": "图片不能超过 %dMB" % (BG_MAX // 1048576)}
+        if size == 0:
+            if os.path.exists(BG_FILE):
+                os.remove(BG_FILE)
+            log("网页背景已恢复默认")
+            return {"ok": 1, "msg": "已恢复默认背景"}
+        data = self.rfile.read(size)
+        if len(data) != size or not image_type(data):
+            return {"ok": 0, "msg": "仅支持 JPG / PNG / WebP / GIF 图片"}
+        tmp = BG_FILE + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, BG_FILE)
+        log("网页背景已更新: %s, %dKB" % (image_type(data), size // 1024))
+        return {"ok": 1, "msg": "背景已更新"}
 
     def install(self, path):
         """
@@ -709,12 +768,15 @@ class WebHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         # 删除节点：POST /api/delete?token=xxx&name=节点名或ID
         # 管理接口：POST /api/admin?token=xxx&action=list|delete|rename|order|update|upgrade|refresh&id=..&name=..&order=..
+        # 网页背景：POST /api/admin?token=xxx&action=background，请求体为图片文件，为空则恢复默认
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path not in ("/api/delete", "/api/admin"):
             return self.send(404, b'{"ok":0}')
         if not secrets.compare_digest(q.get("token", ""), CFG["token"]):
             return self.send(403, b'{"ok":0,"msg":"token error"}')
+        if q.get("action") == "background":
+            return self.send(200, json.dumps(self.set_background(), ensure_ascii=False).encode("utf-8"))
         if url.path == "/api/delete":
             n = STORE.delete(q.get("name", ""))
             STORE.save()

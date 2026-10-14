@@ -13,6 +13,7 @@ server/web/server-status/index.html
 server/web/server-status/network.html
 server/web/favicon.ico
 server/web/static/nezha-adapter.js
+server/web/static/glass.css
 server/web/static/LICENSE-nezha
 server/web/static/logo.svg
 server/web/static/darkmode.css

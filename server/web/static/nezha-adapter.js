@@ -227,4 +227,44 @@
             return t.key === 'default' || t.key === 'server-status';
         });
     }
+
+    // ServerStatus 主题默认开启半透明（毛玻璃）模式；之前访问过的浏览器也切换一次，之后以访客的选择为准
+    try {
+        if (localStorage.getItem('nzGlassDefault') !== '1') {
+            localStorage.setItem('semiTransparent', 'true');
+            localStorage.setItem('nzGlassDefault', '1');
+        }
+    } catch (e) {}
+
+    // 更换背景图片：选择图片后上传到主控（需主控 Token，首次输入后保存在本浏览器）
+    window.nzUploadBackground = function () {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+        input.onchange = function () {
+            var file = input.files[0];
+            if (!file) return;
+            if (file.size > 10 * 1024 * 1024) return alert('图片不能超过 10MB');
+            var token = localStorage.getItem('nzToken') || prompt('请输入主控 Token（在主控上运行 probe，选择「8. 查看 Token 与添加命令」）');
+            if (!token) return;
+            fetch('/api/admin?action=background&token=' + encodeURIComponent(token.trim()), { method: 'POST', body: file })
+                .then(function (r) {
+                    if (r.status === 403) throw new Error('Token 错误');
+                    return r.json();
+                })
+                .then(function (d) {
+                    if (!d.ok) throw new Error(d.msg || '上传失败');
+                    localStorage.setItem('nzToken', token.trim());
+                    // 刷新背景（带时间戳避开缓存）
+                    var style = document.getElementById('nzBackground') || document.head.appendChild(document.createElement('style'));
+                    style.id = 'nzBackground';
+                    style.textContent = 'body[theme]::before{background-image:url(/background?t=' + Date.now() + ') !important}';
+                })
+                .catch(function (e) {
+                    if (e.message === 'Token 错误') localStorage.removeItem('nzToken');
+                    alert('更换背景失败：' + e.message);
+                });
+        };
+        input.click();
+    };
 })();

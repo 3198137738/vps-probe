@@ -1,0 +1,76 @@
+/* ServerStatus 主题半透明模式的毛玻璃效果（工具栏「水滴」按钮可关闭）
+   背景图来自 /background：主控上传了自定义图片时使用该图片，否则为主题自带背景 */
+
+body[theme]::before {
+    background-image: url(/background) !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: cover !important;   /* 任意比例的图片都铺满屏幕，居中裁切 */
+}
+
+/* 浅色 */
+body[theme="light"] .navbar,
+body[theme="light"] .content,
+body[theme="light"] footer,
+body[theme="light"] .navbar .dropdown-menu,
+body[theme="light"] .modal-content,
+body[theme="light"] .toolbox i {
+    background-color: rgba(255, 255, 255, 0.42) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+}
+
+body[theme="light"] .navbar,
+body[theme="light"] .content,
+body[theme="light"] .modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+body[theme="light"] .content {
+    box-shadow: 0 8px 32px rgba(31, 38, 60, 0.18) !important;
+}
+
+/* 深色 */
+body[theme="dark"] {
+    background-color: transparent !important;
+}
+
+body[theme="dark"] .navbar,
+body[theme="dark"] .content,
+body[theme="dark"] footer,
+body[theme="dark"] .navbar .dropdown-menu,
+body[theme="dark"] .modal-content,
+body[theme="dark"] .toolbox i {
+    background-color: rgba(16, 18, 27, 0.5) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+}
+
+body[theme="dark"] .navbar,
+body[theme="dark"] .content,
+body[theme="dark"] .modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body[theme="dark"] .content {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* 圆角与间距 */
+body[theme] .content {
+    border-radius: 14px !important;
+}
+
+body[theme] footer {
+    border-radius: 10px;
+    margin: 0 auto 12px;
+    width: fit-content;
+    max-width: 95%;
+    padding: 4px 14px;
+}
+
+/* 浏览器不支持毛玻璃时提高不透明度，保证文字可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    body[theme="light"] .content { background-color: rgba(255, 255, 255, 0.82) !important; }
+    body[theme="dark"] .content { background-color: rgba(16, 18, 27, 0.85) !important; }
+}

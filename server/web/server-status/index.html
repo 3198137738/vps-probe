@@ -553,6 +553,9 @@
             <span class="toggleSemiTransparent" @click="toggleSemiTransparent">
                 <i class="bi" :class="semiTransparent ? 'bi-droplet' : 'bi-droplet-half'"></i>
             </span>
+            <span v-if="semiTransparent" class="setBackground" title="更换背景图片">
+                <i onclick="nzUploadBackground()" class="bi bi-image"></i>
+            </span>
         </template>
            <span v-if="!showTools">
             <i @click="toggleShowTools" class="bi bi-three-dots"></i>
@@ -567,7 +570,8 @@
     </aside>
     <template v-if="semiTransparent">
         <link rel="stylesheet" href="/static/theme-server-status/css/light.plus.css?v20241103">
-    	<link rel="stylesheet" href="/static/theme-server-status/css/dark.plus.css?v20241103"> 
+    	<link rel="stylesheet" href="/static/theme-server-status/css/dark.plus.css?v20241103">
+        <link rel="stylesheet" href="/static/glass.css"> 
     </template>
 </div>
 
