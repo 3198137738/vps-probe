@@ -35,6 +35,15 @@ BG_DEFAULT = os.path.join(WEB_DIR, "static", "theme-server-status", "img", "bg.j
 BG_MAX = 10 * 1024 * 1024
 
 
+def background_version():
+    """背景图版本（自定义图片的修改时间与大小），变化时网页立即换图；未自定义为空"""
+    try:
+        st = os.stat(BG_FILE)
+        return "%x-%x" % (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return ""
+
+
 def image_type(data):
     """按文件头识别图片格式，非图片返回 None"""
     if data[:3] == b"\xff\xd8\xff":
@@ -498,7 +507,8 @@ class Store:
                     "cpu_info": html.escape("%s | %s 核" % (s[10] or "未知", s[4])),
                     "custom": html.escape("系统: %s (%s)" % (s[8], s[9])),
                 })
-        body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7], "title": CFG["title"]},
+        body = json.dumps({"servers": servers, "updated": str(int(now)), "version": VERSION[:7], "title": CFG["title"],
+                           "bg": background_version()},
                           ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         gz = gzip.compress(body, 6)
         self.ss_cache = (now, body, gz)

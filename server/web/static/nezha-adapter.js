@@ -103,6 +103,18 @@
         }
     }
 
+    // 换用新的背景图：选择器比 glass.css 更具体，确保覆盖；带版本号避开浏览器缓存
+    var lastBg = null;
+    function applyBackground(ver) {
+        var style = document.getElementById('nzBackground');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'nzBackground';
+            document.head.appendChild(style);
+        }
+        style.textContent = 'html body[theme]::before{background-image:url(/background?v=' + encodeURIComponent(ver) + ') !important}';
+    }
+
     window.nzFetchStats = function () {
         return fetch('/json/stats.json', { cache: 'no-store' }).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -117,6 +129,11 @@
             if (data.title) {
                 document.title = data.title;
                 setText('brand', data.title);
+            }
+            // 背景图在主控上更换后（网页、probe 或接口），所有已打开的页面立即换图
+            if (data.bg !== undefined && data.bg !== lastBg) {
+                if (lastBg !== null) applyBackground(data.bg || 'default');
+                lastBg = data.bg;
             }
             return convert(data);
         });
@@ -255,10 +272,7 @@
                 .then(function (d) {
                     if (!d.ok) throw new Error(d.msg || '上传失败');
                     localStorage.setItem('nzToken', token.trim());
-                    // 刷新背景（带时间戳避开缓存）
-                    var style = document.getElementById('nzBackground') || document.head.appendChild(document.createElement('style'));
-                    style.id = 'nzBackground';
-                    style.textContent = 'body[theme]::before{background-image:url(/background?t=' + Date.now() + ') !important}';
+                    applyBackground('t' + Date.now());
                 })
                 .catch(function (e) {
                     if (e.message === 'Token 错误') localStorage.removeItem('nzToken');
