@@ -11,58 +11,172 @@
         if (localStorage.getItem('ss_theme') === 'light') document.documentElement.classList.remove('dark');
     </script>
     <style>
+        :root {
+            --bg-canvas: #F4F6FA;
+            --bg-surface: #FFFFFF;
+            --bg-surface-hover: #F1F5F9;
+            --bg-drawer: #F8FAFC;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-hairline: #E2E8F0;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --pill-track: #F1F5F9;
+            --pill-thumb: #FFFFFF;
+            --capsule-track: #E2E8F0;
+        }
+        html.dark {
+            --bg-canvas: #090A0F;
+            --bg-surface: #11131A;
+            --bg-surface-hover: #171A24;
+            --bg-drawer: #161922;
+            --bg-glass: rgba(17, 19, 26, 0.82);
+            --border-hairline: rgba(255, 255, 255, 0.07);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --pill-track: #0D0F16;
+            --pill-thumb: #1E2230;
+            --capsule-track: rgba(255, 255, 255, 0.07);
+        }
         * {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            transition: background-color 250ms ease, color 250ms ease;
+        }
+        .surface-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-hairline);
+            transition: background-color 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
+        }
+        .glass-header {
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-hairline);
+            transition: background-color 250ms ease, border-color 250ms ease;
         }
         .tabular-nums {
             font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum" 1;
         }
-        /* 进度条宽度与颜色平滑过渡 */
-        .ss-bar-fill {
-            transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+        /* 0fr -> 1fr Hardware-Accelerated Accordion Drawer */
+        .drawer-grid {
+            display: grid;
+            grid-template-rows: 0fr;
+            opacity: 0;
+            transition: grid-template-rows 380ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms ease;
+            will-change: grid-template-rows, opacity;
         }
-        /* 实时同步呼吸灯 */
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.45; transform: scale(0.92); }
+        .drawer-grid.is-open {
+            grid-template-rows: 1fr;
+            opacity: 1;
         }
-        .live-dot {
-            animation: pulse-dot 1.8s ease-in-out infinite;
+        .drawer-inner {
+            overflow: hidden;
+            min-height: 0;
         }
-        /* 展开详情 */
-        .accordion-content {
-            animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        /* Sliding Pill Segmented Control */
+        .seg-track {
+            position: relative;
+            background-color: var(--pill-track);
+            border: 1px solid var(--border-hairline);
+            border-radius: 0.5rem;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
         }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
+        .seg-thumb {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            left: 0;
+            background-color: var(--pill-thumb);
+            border-radius: 0.375rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+            transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms cubic-bezier(0.22, 1, 0.36, 1), background-color 250ms ease;
+            will-change: transform, width;
+            pointer-events: none;
+            z-index: 0;
         }
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+        .seg-btn {
+            position: relative;
+            z-index: 1;
+            transition: color 180ms ease;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        /* 18px Classic ServerStatus Capsule Progress Bar */
+        .ss-capsule {
+            position: relative;
+            height: 18px;
+            border-radius: 5px;
+            background-color: var(--capsule-track);
+            overflow: hidden;
+            user-select: none;
         }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.25);
-            border-radius: 9999px;
+        .ss-capsule-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: background-color 300ms ease;
+            will-change: width;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.45);
+        .ss-capsule-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1;
+            letter-spacing: -0.01em;
+            color: #FFFFFF;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+            pointer-events: none;
         }
+        html:not(.dark) .ss-capsule-text {
+            color: #0F172A;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
+        }
+        /* Live Beacon Animation */
+        @keyframes beaconPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.85); opacity: 0; }
+        }
+        .beacon-ring {
+            animation: beaconPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        /* Sortable Header Hover */
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: color 150ms ease, background-color 150ms ease;
+        }
+        th.sortable:hover {
+            color: var(--text-primary);
+            background-color: rgba(148, 163, 184, 0.08);
+        }
+        /* Custom Slim Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
     </style>
 </head>
-<body class="bg-canvas-light dark:bg-canvas-dark text-slate-800 dark:text-slate-100 font-sans min-h-screen flex flex-col selection:bg-emerald-500/20 selection:text-emerald-400 transition-colors duration-200">
+<body class="font-sans min-h-screen flex flex-col selection:bg-emerald-500/20 selection:text-emerald-400">
 
-    <header class="sticky top-0 z-30 backdrop-blur-md bg-white/85 dark:bg-[#0b0f17]/85 border-b border-slate-200/80 dark:border-slate-800/80">
-        <div class="max-w-[1440px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
-
-            <!-- 左：标题 + 实时同步状态 -->
-            <div class="flex items-center gap-3 shrink-0">
+    <!-- Top Floating Glass Header -->
+    <header class="sticky top-0 z-30 glass-header">
+        <div class="max-w-[1520px] mx-auto px-3 sm:px-5 h-14 flex items-center justify-between gap-3">
+            
+            <!-- Left: Brand Logo + Live Pulsing Beacon + Data Mode Badge -->
+            <div class="flex items-center gap-2.5 shrink-0">
                 <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-slate-900 dark:bg-emerald-500/15 border border-slate-800 dark:border-emerald-500/30 flex items-center justify-center text-white dark:text-emerald-400">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
                             <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
@@ -70,179 +184,331 @@
                             <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
                     </div>
-                    <span id="brandTitle" class="font-semibold tracking-tight text-sm sm:text-base text-slate-900 dark:text-white">云监控</span>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span id="brandTitle" class="font-bold tracking-tight text-sm sm:text-base">云监控</span>
+                        </div>
+                    </div>
                 </div>
 
-                <button id="syncToggleBtn" onclick="toggleSync()" title="点击暂停或恢复实时刷新" class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums border border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15 transition">
-                    <span id="syncDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"></span>
-                    <span id="syncText">连接中…</span>
+                <!-- Pause / Resume Stream Button -->
+                <button id="streamToggleBtn" onclick="toggleStreamPause()" title="点击暂停或恢复实时数据流" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tabular-nums border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer">
+                    <span class="relative flex h-2 w-2">
+                        <span id="streamBeaconRing" class="beacon-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span id="streamBeaconDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span id="streamStatusLabel">连接中…</span>
                 </button>
             </div>
 
-            <!-- 中：汇总（宽屏显示） -->
+            <!-- Center: 4-Pill Global Telemetry Strip -->
             <div class="hidden xl:flex items-center gap-2 text-xs font-mono tabular-nums">
-                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
-                    <span class="text-slate-400 dark:text-slate-500 font-sans">节点</span>
-                    <span id="hdrOnlineText" class="font-semibold text-slate-800 dark:text-slate-200">- / - 在线</span>
+                <!-- Pill 1: Online Ratio + IPv6 Count -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
+                    <span class="text-[11px] font-sans text-slate-400">在线节点</span>
+                    <span id="sumOnlineCount" class="font-semibold text-emerald-500">- / -</span>
+                    <span class="text-slate-300 dark:text-slate-700">|</span>
+                    <span id="sumIpv6Count" class="text-[11px] text-sky-500">0 IPv6</span>
                 </div>
-                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
-                    <span class="text-slate-400 dark:text-slate-500 font-sans">总带宽</span>
-                    <span class="text-emerald-600 dark:text-emerald-400 font-medium">↓ <span id="hdrTotalRx">0 KB/s</span></span>
+                <!-- Pill 2: Global Live RX -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
+                    <span class="text-[11px] font-sans text-slate-400">∑ 实时下行</span>
+                    <span class="text-sky-500 font-semibold">↓ <span id="sumTotalRx">0.0 MB/s</span></span>
+                </div>
+                <!-- Pill 3: Global Live TX -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
+                    <span class="text-[11px] font-sans text-slate-400">∑ 实时上行</span>
+                    <span class="text-emerald-500 font-semibold">↑ <span id="sumTotalTx">0.0 MB/s</span></span>
+                </div>
+                <!-- Pill 4: Monthly Total Traffic + Timestamp -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded-lg surface-card">
+                    <span class="text-[11px] font-sans text-slate-400">本月总流量</span>
+                    <span id="sumTotalTraffic" class="font-semibold">0 MiB</span>
                     <span class="text-slate-300 dark:text-slate-700">·</span>
-                    <span class="text-sky-600 dark:text-sky-400 font-medium">↑ <span id="hdrTotalTx">0 KB/s</span></span>
-                </div>
-                <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800/80">
-                    <span class="text-slate-400 dark:text-slate-500 font-sans">本月总流量</span>
-                    <span id="hdrTotalTraffic" class="font-semibold text-slate-800 dark:text-slate-200">0</span>
+                    <span id="sumUpdatedClock" class="text-[11px] text-slate-400">--:--:--</span>
                 </div>
             </div>
 
-            <!-- 右：工具按钮 -->
+            <!-- Right: Compact Action Controls -->
             <div class="flex items-center gap-1.5 sm:gap-2">
-                <div class="relative w-32 sm:w-48 md:w-56">
-                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input
-                        id="searchInput"
-                        type="text"
-                        oninput="handleSearch(this.value)"
-                        placeholder="筛选节点 / 地区 / 系统..."
-                        class="w-full pl-8 pr-6 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-slate-400 dark:focus:border-slate-600 transition"
-                    />
-                    <kbd class="hidden sm:inline-block absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-400">/</kbd>
+                <!-- Progress Bar Label Segmented Control (% vs GiB) -->
+                <div id="segBarMode" class="seg-track hidden md:inline-flex" title="切换进度条内部文字：百分比 (%) 或 精确容量 (GiB)">
+                    <div class="seg-thumb" id="thumbBarMode"></div>
+                    <button type="button" data-val="pct" onclick="setBarLabelMode('pct')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">% 百分比</button>
+                    <button type="button" data-val="cap" onclick="setBarLabelMode('cap')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">GiB 容量</button>
                 </div>
 
-                <!-- 进度条文字：百分比 / 容量 -->
-                <button id="barTextModeBtn" onclick="toggleBarTextMode()" title="切换进度条内部显示：百分比 (%) 或 容量 (GB)" class="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition">
-                    <span id="barTextModeLabel">%</span>
-                </button>
+                <!-- Speed Unit Segmented Control (B/s vs bps) -->
+                <div id="segSpeedUnit" class="seg-track hidden sm:inline-flex" title="切换实时速率单位：字节 (MB/s) 或 比特 (Mbps)">
+                    <div class="seg-thumb" id="thumbSpeedUnit"></div>
+                    <button type="button" data-val="byte" onclick="setSpeedUnit('byte')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">B/s</button>
+                    <button type="button" data-val="bit" onclick="setSpeedUnit('bit')" class="seg-btn px-2 py-1 text-[11px] font-mono font-medium">bps</button>
+                </div>
 
-                <!-- 表格 / 卡片 -->
-                <div class="flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900">
-                    <button id="btnViewTable" onclick="switchView('table')" title="紧凑表格">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
+                <!-- View Switcher Segmented Control (Table vs Hotaru Cards) -->
+                <div id="segViewMode" class="seg-track">
+                    <div class="seg-thumb" id="thumbViewMode"></div>
+                    <button type="button" data-val="table" onclick="setViewMode('table')" class="seg-btn flex items-center gap-1 px-2.5 py-1 text-xs font-medium">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                         <span class="hidden sm:inline">表格</span>
                     </button>
-                    <button id="btnViewCards" onclick="switchView('cards')" title="卡片视图">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
-                        </svg>
-                        <span class="hidden sm:inline">卡片</span>
+                    <button type="button" data-val="cards" onclick="setViewMode('cards')" class="seg-btn flex items-center gap-1 px-2.5 py-1 text-xs font-medium">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                        <span class="hidden sm:inline">Hotaru</span>
                     </button>
                 </div>
 
-                <!-- 主题 -->
-                <button onclick="toggleTheme()" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition" title="切换深浅色主题">
-                    <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                    </svg>
-                    <svg class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                    </svg>
+                <!-- Theme Polarity Toggle -->
+                <button onclick="toggleTheme()" class="p-1.5 rounded-lg surface-card hover:border-slate-400 dark:hover:border-slate-600 transition cursor-pointer" title="切换深色 / 浅色模式">
+                    <svg class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <svg class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-6 py-4 space-y-3.5">
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-[1520px] w-full mx-auto px-3 sm:px-5 py-4 space-y-3.5">
 
-        <!-- 分组筛选 + 窄屏汇总 -->
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <div id="groupPillsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"></div>
+        <!-- Control Toolbar: Sliding Region Tabs + Instant Search + Mobile Telemetry -->
+        <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <!-- Region Filter Segmented Control with Sliding Pill -->
+            <div class="overflow-x-auto max-w-full pb-0.5 sm:pb-0">
+                <div id="segRegion" class="seg-track">
+                    <div class="seg-thumb" id="thumbRegion"></div>
+                    <button type="button" data-val="ALL" onclick="setRegionFilter('ALL')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap">全部 <span id="cnt-ALL" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                    <button type="button" data-val="亚太" onclick="setRegionFilter('亚太')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">亚太 <span id="cnt-亚太" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                    <button type="button" data-val="北美" onclick="setRegionFilter('北美')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">北美 <span id="cnt-北美" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                    <button type="button" data-val="欧洲" onclick="setRegionFilter('欧洲')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">欧洲 <span id="cnt-欧洲" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                    <button type="button" data-val="其他" onclick="setRegionFilter('其他')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap hidden">其他 <span id="cnt-其他" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                    <button type="button" data-val="ALERT" onclick="setRegionFilter('ALERT')" class="seg-btn px-3 py-1 text-xs font-medium whitespace-nowrap text-amber-500">异常/告警 <span id="cnt-ALERT" class="font-mono text-[10px] opacity-75 ml-0.5">0</span></button>
+                </div>
+            </div>
 
-            <div class="flex xl:hidden items-center gap-3 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                <span>在线: <strong id="mobOnlineText" class="text-slate-800 dark:text-slate-200">-/-</strong></span>
-                <span class="text-emerald-500">↓ <span id="mobTotalRx">0K</span></span>
-                <span class="text-sky-500">↑ <span id="mobTotalTx">0K</span></span>
+            <!-- Right Search Input & Mobile Summary Strip -->
+            <div class="flex items-center gap-2.5 ml-auto">
+                <div class="flex xl:hidden items-center gap-2 text-[11px] font-mono tabular-nums px-2.5 py-1 rounded-lg surface-card">
+                    <span id="mobOnline" class="text-emerald-500 font-semibold">-/-</span>
+                    <span class="text-sky-500">↓<span id="mobRx">0.0M</span></span>
+                    <span class="text-emerald-500">↑<span id="mobTx">0.0M</span></span>
+                </div>
+
+                <div class="relative w-48 sm:w-64">
+                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input
+                        id="searchInput"
+                        type="text"
+                        oninput="handleSearchInput(this.value)"
+                        placeholder="搜索节点 / 地区 / 虚拟化 / 系统..."
+                        class="w-full pl-8 pr-12 py-1.5 text-xs rounded-lg surface-card focus:outline-none focus:border-emerald-500/60 placeholder-slate-400 dark:placeholder-slate-500"
+                    />
+                    <kbd id="searchKbdHint" class=" absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-400 pointer-events-none">/</kbd>
+                </div>
             </div>
         </div>
 
-        <div id="mainViewContainer"></div>
+        <!-- View 1: 12-Column Classic ServerStatus High-Density Table -->
+        <div id="tableViewWrapper" class="surface-card rounded-xl shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200/80 dark:border-white/[0.07] bg-slate-100/60 dark:bg-white/[0.02] text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider whitespace-nowrap">
+                            <th class="py-2.5 pl-3.5 pr-2 w-[72px]">状态</th>
+                            <th class="py-2.5 px-2.5 min-w-[165px]">节点名称</th>
+                            <th class="py-2.5 px-2 w-[78px]">虚拟化</th>
+                            <th class="py-2.5 px-2 w-[92px]">位置</th>
+                            <th onclick="cycleSort('uptimeSec')" class="sortable py-2.5 px-2 w-[82px] text-right" title="点击按在线时间排序">
+                                <span class="inline-flex items-center justify-end gap-1">在线时间<span id="sort-uptimeSec" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('load1')" class="sortable py-2.5 px-2 w-[68px] text-right" title="点击按系统 1 分钟负载排序">
+                                <span class="inline-flex items-center justify-end gap-1">负载<span id="sort-load1" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('speed')" class="sortable py-2.5 px-2.5 w-[138px] text-right" title="点击按实时总网速排序">
+                                <span class="inline-flex items-center justify-end gap-1">实时网速 ↓/↑<span id="sort-speed" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('traffic')" class="sortable py-2.5 px-2.5 w-[124px] text-right hidden lg:table-cell" title="点击按本月流量排序（悬停数值查看累计）">
+                                <span class="inline-flex items-center justify-end gap-1">月流量 ↓/↑<span id="sort-traffic" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('ping')" class="sortable py-2.5 px-2.5 w-[128px] text-center hidden xl:table-cell" title="点击按三网平均延迟排序 (电信 CT / 联通 CU / 移动 CM)">
+                                <span class="inline-flex items-center justify-center gap-1">三网 CT/CU/CM<span id="sort-ping" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('cpu')" class="sortable py-2.5 px-2 w-[108px] text-center" title="点击按 CPU 占用率排序">
+                                <span class="inline-flex items-center justify-center gap-1">CPU<span id="sort-cpu" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('mem')" class="sortable py-2.5 px-2 w-[122px] text-center" title="点击按内存占用率排序 (底部 2px 细条为 Swap)">
+                                <span class="inline-flex items-center justify-center gap-1">内存 <span class="text-[9px] font-normal opacity-60">+Swap</span><span id="sort-mem" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                            <th onclick="cycleSort('hdd')" class="sortable py-2.5 pl-2 pr-3.5 w-[114px] text-center hidden md:table-cell" title="点击按硬盘占用率排序">
+                                <span class="inline-flex items-center justify-center gap-1">硬盘<span id="sort-hdd" class="text-[10px] opacity-40">↕</span></span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="serverTableBody" class="divide-y divide-slate-200/60 dark:divide-white/[0.05] text-xs font-mono tabular-nums">
+                        <!-- Keyed Incremental DOM rows mounted ONCE here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- View 2: Hotaru Card Grid View -->
+        <div id="cardViewWrapper" class="hidden grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 items-start">
+            <!-- Keyed Incremental Hotaru cards mounted ONCE here -->
+        </div>
+
+        <!-- Empty Filter State -->
+        <div id="emptyFilterState" class="hidden surface-card rounded-xl p-10 text-center space-y-2.5">
+            <p id="emptyFilterText" class="text-xs text-slate-400">正在加载节点数据…</p>
+            <button id="emptyFilterBtn" onclick="resetAllFilters()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition cursor-pointer">重置所有筛选条件</button>
+        </div>
 
     </main>
 
-    <footer class="border-t border-slate-200/70 dark:border-slate-800/60 py-3.5 mt-8">
-        <div class="max-w-[1440px] mx-auto px-3 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+    <!-- Minimalist Footer -->
+    <footer class="mt-auto border-t border-slate-200/70 dark:border-white/[0.06] py-3.5">
+        <div class="max-w-[1520px] mx-auto px-3 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono text-slate-400">
             <div class="flex items-center gap-2">
                 <span>版本 <span id="footerVersion" class="text-slate-600 dark:text-slate-300">-</span></span>
             </div>
-            <div class="flex items-center gap-3">
-                <span class="font-sans">点击任意节点可展开 <code class="font-mono text-emerald-500">t/u/p/d</code> 与三网延迟曲线</span>
-                <span>·</span>
-                <span class="font-sans">更新于</span>
-                <span id="footerTimestamp" class="tabular-nums">--:--:--</span>
+            <div class="flex items-center gap-3 font-sans">
+                <span>点击表头可升降序排列 · 点击任意节点展开 <code class="font-mono text-emerald-500">t/u/p/d</code> 与三网 24 小时延迟曲线</span>
             </div>
         </div>
     </footer>
 
     <script>
-        const REFRESH_MS = 3000;
-        const NET_POINTS = 40;              // 实时吞吐保留最近 40 次刷新（约 2 分钟）
-        const ISSUE = '__ISSUE__';
+        /* ==========================================================================
+           1. 常量与状态
+           ========================================================================== */
+        const POLL_MS = 3000;           // 拉取 json/stats.json 的间隔，与客户端默认上报间隔一致
+        const NET_POINTS = 40;          // 实时吞吐曲线保留最近 40 次（约 2 分钟）
+        const REGION_GROUPS = {
+            '亚太': ['HK', 'MO', 'TW', 'CN', 'JP', 'KR', 'SG', 'MY', 'TH', 'VN', 'PH', 'ID', 'IN', 'AU', 'NZ', 'KH', 'BD', 'PK', 'MN'],
+            '北美': ['US', 'CA', 'MX'],
+            '欧洲': ['DE', 'GB', 'NL', 'FR', 'RU', 'FI', 'SE', 'CH', 'IT', 'ES', 'PL', 'NO', 'DK', 'IE', 'AT', 'BE', 'CZ', 'RO', 'BG', 'UA', 'LU', 'PT', 'HU', 'LT', 'LV', 'EE', 'IS', 'MD', 'RS', 'GR']
+        };
 
-        let servers = [];
+        const domRefs = new Map();      // id -> 缓存的 DOM 引用
+        const nodeStates = new Map();   // id -> { raw, current（插值中）, target, history }
+        let serverOrder = [];           // 主控返回的节点顺序
+
+        const prefs = {
+            theme: localStorage.getItem('ss_theme') || 'dark',
+            viewMode: localStorage.getItem('ss_viewMode') === 'cards' ? 'cards' : 'table',
+            barMode: localStorage.getItem('ss_barMode') === 'cap' ? 'cap' : 'pct',
+            speedUnit: localStorage.getItem('ss_speedUnit') === 'bit' ? 'bit' : 'byte'
+        };
+
+        let regionFilter = 'ALL';
+        let searchQuery = '';
+        let sortField = null;           // null | 'uptimeSec' | 'load1' | 'speed' | 'traffic' | 'ping' | 'cpu' | 'mem' | 'hdd'
+        let sortDir = 'desc';
+        let expandedId = null;
+        let chartTab = 'ping';          // 'ping' 三网 24 小时延迟 | 'net' 实时吞吐
+        let isStreamPaused = false;
+        let pollTimer = null;
+        let fetching = false;
         let loaded = false;
         let pageVersion = '';
-        let currentView = localStorage.getItem('ss_view') === 'cards' ? 'cards' : 'table';
-        let currentGroup = 'ALL';          // 'ALL' | 国家代码 | ISSUE
-        let searchQuery = '';
-        let barShowCapacity = localStorage.getItem('ss_cap') === '1';
-        let expandedServerId = null;
-        let activeChartTab = 'ping';       // 'ping' 三网 24 小时延迟 | 'net' 实时吞吐
-        let syncRunning = true;
-        let syncTimer = null;
-        let fetching = false;
+        let lastFrameTime = performance.now();
+        let canvasHoverX = null;
 
-        const netHistory = {};             // id -> { rx: [], tx: [] }，单位 MB/s
-        const p24 = { at: 0, data: null }; // json/ping24h.json，每分钟拉取一次
+        const p24 = { at: 0, data: null };  // json/ping24h.json，每分钟拉取一次
 
+        const globalPhysics = {
+            curRx: 0, tgtRx: 0,
+            curTx: 0, tgtTx: 0,
+            curTraffic: 0, tgtTraffic: 0
+        };
+
+        /* ==========================================================================
+           2. 格式化与工具函数
+           ========================================================================== */
         let regionDisplay = null;
         try { regionDisplay = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); } catch (e) {}
 
         function regionName(cc) {
-            if (!/^[A-Z]{2}$/.test(cc)) return '未知地区';
+            if (!/^[A-Z]{2}$/.test(cc)) return '未知';
             try { return regionDisplay ? regionDisplay.of(cc) : cc; } catch (e) { return cc; }
+        }
+
+        function regionGroupOf(cc) {
+            for (const g in REGION_GROUPS) if (REGION_GROUPS[g].includes(cc)) return g;
+            return '其他';
         }
 
         function esc(v) {
             return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         }
 
-        function pct(used, total) {
-            return total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
+        // cpu_info / custom 由服务端转义过，先还原为纯文本，插入页面时统一转义
+        function unesc(s) {
+            const t = document.createElement('textarea');
+            t.innerHTML = String(s || '');
+            return t.value;
         }
 
-        function isOnline(s) {
-            return Boolean(s.online4 || s.online6);
+        // 只在值变化时写 DOM，动画循环每帧调用也不会引起多余的重排
+        function setText(el, v) { if (el._t !== v) { el._t = v; el.textContent = v; } }
+        function setHtml(el, v) { if (el._h !== v) { el._h = v; el.innerHTML = v; } }
+        function setStyle(el, k, v) { const key = '_s' + k; if (el[key] !== v) { el[key] = v; el.style[k] = v; } }
+
+        function isNodeOnline(raw) {
+            return Boolean(raw.online4 || raw.online6);
         }
 
-        function formatBytesRate(bytesPerSec, compact = false) {
-            if (!bytesPerSec || bytesPerSec <= 0) return compact ? '0K' : '0 KB/s';
-            const mb = bytesPerSec / (1024 * 1024);
-            if (mb >= 1) {
-                return compact ? `${mb.toFixed(1)}M` : `${mb.toFixed(1)} MB/s`;
+        function isNodeAlert(raw) {
+            if (!isNodeOnline(raw)) return true;
+            const memPct = raw.memory_total > 0 ? (raw.memory_used / raw.memory_total) * 100 : 0;
+            return raw.cpu >= 85 || memPct >= 88 || raw.load_1 >= 2.0;
+        }
+
+        // 胶囊进度条颜色：<70% 绿，70-88% 黄，>=88% 红
+        function getCapsuleColor(pct, online = true) {
+            if (!online) return '#475569';
+            if (pct >= 88) return '#EF4444';
+            if (pct >= 70) return '#F59E0B';
+            return '#10B981';
+        }
+
+        function formatSpeed(bytesPerSec, compact = false, unit = prefs.speedUnit) {
+            if (!bytesPerSec || bytesPerSec < 1) {
+                return unit === 'bit' ? (compact ? '0K' : '0 Kbps') : (compact ? '0K' : '0 KB/s');
             }
+            if (unit === 'bit') {
+                const bits = bytesPerSec * 8;
+                const gbps = bits / 1e9;
+                if (gbps >= 1) return compact ? `${gbps.toFixed(1)}G` : `${gbps.toFixed(2)} Gbps`;
+                const mbps = bits / 1e6;
+                if (mbps >= 1) return compact ? `${mbps.toFixed(1)}M` : `${mbps.toFixed(1)} Mbps`;
+                const kbps = bits / 1e3;
+                return compact ? `${kbps.toFixed(0)}K` : `${kbps.toFixed(0)} Kbps`;
+            }
+            const mb = bytesPerSec / 1048576;
+            if (mb >= 1) return compact ? `${mb.toFixed(1)}M` : `${mb.toFixed(1)} MB/s`;
             const kb = bytesPerSec / 1024;
             return compact ? `${kb.toFixed(0)}K` : `${kb.toFixed(0)} KB/s`;
         }
 
-        function formatTraffic(bytes) {
-            if (!bytes || bytes <= 0) return '0';
-            const units = ['B', 'K', 'M', 'G', 'T', 'P'];
-            let i = 0;
-            while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
-            return bytes.toFixed(i >= 4 ? 2 : (i === 3 && bytes < 100 ? 1 : 0)) + units[i];
+        function formatTraffic(bytes, detailed = false) {
+            if (!bytes || bytes <= 0) return detailed ? '0 MiB' : '0M';
+            const tib = bytes / (1024 ** 4);
+            if (tib >= 1) return detailed ? `${tib.toFixed(2)} TiB` : `${tib.toFixed(2)}T`;
+            const gib = bytes / (1024 ** 3);
+            if (gib >= 1) return detailed ? `${gib.toFixed(1)} GiB` : `${gib < 10 ? gib.toFixed(1) : gib.toFixed(0)}G`;
+            const mib = bytes / (1024 ** 2);
+            return detailed ? `${mib.toFixed(0)} MiB` : `${mib.toFixed(0)}M`;
         }
 
-        function formatGB(gb) {
-            return gb >= 10 ? gb.toFixed(0) : gb.toFixed(1);
+        function formatGiBFromKiB(usedKiB, totalKiB) {
+            const u = (usedKiB / 1048576).toFixed(1);
+            const t = (totalKiB / 1048576).toFixed(1).replace(/\.0$/, '');
+            return `${u}/${t}G`;
         }
 
-        function formatRamCap(usedMB, totalMB) {
-            return `${(usedMB / 1024).toFixed(1)}/${formatGB(totalMB / 1024)}G`;
+        function formatGiBFromMiB(usedMiB, totalMiB) {
+            const u = (usedMiB / 1024).toFixed(0);
+            const t = (totalMiB / 1024).toFixed(0);
+            return `${u}/${t}G`;
         }
 
         function formatTime(ts) {
@@ -260,682 +526,1003 @@
             return (loss > 0 && loss < 10 ? loss.toFixed(1) : Math.round(loss)) + '%';
         }
 
-        // 胶囊进度条颜色（<60% 绿，60-85% 黄，>85% 红）
-        function getCapsuleColorClass(p, online = true) {
-            if (!online) return 'bg-slate-400/30 dark:bg-slate-700/40';
-            if (p >= 85) return 'bg-rose-500/90 dark:bg-rose-500/85';
-            if (p >= 60) return 'bg-amber-500/90 dark:bg-amber-500/85';
-            return 'bg-emerald-500/85 dark:bg-emerald-500/80';
-        }
-
-        function getPingClass(ms) {
-            if (!ms || ms <= 0) return 'text-rose-500';
-            if (ms < 60) return 'text-emerald-600 dark:text-emerald-400';
-            if (ms < 140) return 'text-amber-600 dark:text-amber-400';
-            return 'text-orange-500 dark:text-orange-400';
-        }
-
-        function pingText(ms) {
-            return ms > 0 ? ms : '-';
-        }
-
-        // 地区标识
-        function renderFlagBadge(code) {
-            const map = {
-                CN: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25',
-                HK: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/25',
-                JP: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/25',
-                SG: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
-                TW: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
-                US: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
-                DE: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',
-                NL: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/25',
-                KR: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25',
-                GB: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/25',
-                FR: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/25',
-                RU: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/25'
+        function getFlagBadgeHtml(code) {
+            const styles = {
+                HK: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+                JP: 'bg-sky-500/15 text-sky-500 border-sky-500/30',
+                SG: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+                TW: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+                KR: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+                US: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+                DE: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+                GB: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+                CN: 'bg-red-500/15 text-red-400 border-red-500/30',
+                NL: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+                FR: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+                RU: 'bg-teal-500/15 text-teal-400 border-teal-500/30'
             };
-            const cls = map[code] || 'bg-slate-500/15 text-slate-500 border-slate-500/25';
             const label = /^[A-Z]{2}$/.test(code) ? code : '--';
-            return `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-semibold rounded border ${cls} shrink-0" title="${esc(regionName(code))}">${label}</span>`;
+            const cls = styles[code] || 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+            return `<span class="inline-flex items-center justify-center w-6 h-4 text-[10px] font-mono font-bold rounded border ${cls} shrink-0">${label}</span>`;
         }
 
-        // json/stats.json -> 页面内部格式。cpu_info / custom 已由服务端转义
-        function ingestStats(list) {
-            servers = list.map(it => {
-                const sys = String(it.custom || '').replace(/^系统:\s*/, '');
-                const s = {
-                    id: String(it.id || ''),
-                    name: it.name || it.id || '-',
-                    location: String(it.location || '').toUpperCase(),
-                    type: String(it.type || '-').toUpperCase(),
-                    sys: sys || '-',
-                    os: sys.split(' (')[0].split(' ')[0] || '-',
-                    cpuInfo: it.cpu_info || '-',
-                    online4: Boolean(it.online4),
-                    online6: Boolean(it.online6),
-                    uptime: it.uptime || '-',
-                    boot_time: it.boot_time || 0,
-                    load_1: Number(it.load_1) || 0,
-                    cpu: Number(it.cpu) || 0,
-                    network_rx: it.network_rx || 0,
-                    network_tx: it.network_tx || 0,
-                    network_in: it.network_in || 0,
-                    network_out: it.network_out || 0,
-                    month_in: Math.max(0, (it.network_in || 0) - (it.last_network_in || 0)),
-                    month_out: Math.max(0, (it.network_out || 0) - (it.last_network_out || 0)),
-                    memory_total: (it.memory_total || 0) / 1024,   // KB -> MB
-                    memory_used: (it.memory_used || 0) / 1024,
-                    swap_total: (it.swap_total || 0) / 1024,
-                    swap_used: (it.swap_used || 0) / 1024,
-                    hdd_total: (it.hdd_total || 0) / 1024,         // MB -> GB
-                    hdd_used: (it.hdd_used || 0) / 1024,
-                    io_read: it.io_read || 0,
-                    io_write: it.io_write || 0,
-                    tcp_count: it.tcp_count || 0,
-                    udp_count: it.udp_count || 0,
-                    process_count: it.process_count || 0,
-                    thread_count: it.thread_count || 0,
-                    time_189: it.time_189 || 0,
-                    time_10010: it.time_10010 || 0,
-                    time_10086: it.time_10086 || 0,
-                    loss_189: it.ping_189 || 0,
-                    loss_10010: it.ping_10010 || 0,
-                    loss_10086: it.ping_10086 || 0
-                };
-                s.regionName = regionName(s.location);
-
-                const online = isOnline(s);
-                const h = netHistory[s.id] || (netHistory[s.id] = { rx: [], tx: [] });
-                h.rx.push(online ? s.network_rx / 1048576 : 0);
-                h.tx.push(online ? s.network_tx / 1048576 : 0);
-                if (h.rx.length > NET_POINTS) { h.rx.shift(); h.tx.shift(); }
-                return s;
-            });
+        /* ==========================================================================
+           3. 数据接入：json/stats.json -> 节点状态
+           ========================================================================== */
+        function normalizeServer(it, idx, now) {
+            const sys = unesc(it.custom).replace(/^系统:\s*/, '');
+            const online = Boolean(it.online4 || it.online6);
+            const location = String(it.location || '').toUpperCase();
+            return {
+                id: String(it.id || it.name || idx),
+                weight: idx,
+                name: String(it.name || it.id || '-'),
+                type: String(it.type || '-').toUpperCase(),
+                location,
+                regionGroup: regionGroupOf(location),
+                locationLabel: regionName(location),
+                sys: sys || '-',
+                os: sys.split(' (')[0] || 'Linux',
+                cpuInfo: unesc(it.cpu_info) || '-',
+                online4: Boolean(it.online4),
+                online6: Boolean(it.online6),
+                uptime: online ? (it.uptime || '-') : '离线',
+                uptimeSec: online && it.boot_time ? now - it.boot_time : -1,
+                boot_time: it.boot_time || 0,
+                load_1: Number(it.load_1) || 0,
+                cpu: Number(it.cpu) || 0,
+                network_rx: it.network_rx || 0,
+                network_tx: it.network_tx || 0,
+                network_in: it.network_in || 0,
+                network_out: it.network_out || 0,
+                monthIn: Math.max(0, (it.network_in || 0) - (it.last_network_in || 0)),
+                monthOut: Math.max(0, (it.network_out || 0) - (it.last_network_out || 0)),
+                memory_total: it.memory_total || 0,   // KiB
+                memory_used: it.memory_used || 0,
+                swap_total: it.swap_total || 0,
+                swap_used: it.swap_used || 0,
+                hdd_total: it.hdd_total || 0,         // MiB
+                hdd_used: it.hdd_used || 0,
+                io_read: it.io_read || 0,
+                io_write: it.io_write || 0,
+                tcp: it.tcp_count || 0,
+                udp: it.udp_count || 0,
+                process: it.process_count || 0,
+                thread: it.thread_count || 0,
+                time_189: it.time_189 || 0,
+                time_10010: it.time_10010 || 0,
+                time_10086: it.time_10086 || 0,
+                ping_189: it.ping_189 || 0,
+                ping_10010: it.ping_10010 || 0,
+                ping_10086: it.ping_10086 || 0
+            };
         }
 
-        function updateHeaderSummary() {
-            const total = servers.length;
-            const onlineList = servers.filter(isOnline);
-            const onlineCount = onlineList.length;
-
-            const totalRx = onlineList.reduce((acc, s) => acc + s.network_rx, 0);
-            const totalTx = onlineList.reduce((acc, s) => acc + s.network_tx, 0);
-            const monthBytes = servers.reduce((acc, s) => acc + s.month_in + s.month_out, 0);
-
-            document.getElementById('hdrOnlineText').textContent = `${onlineCount} / ${total} 在线`;
-            document.getElementById('hdrTotalRx').textContent = formatBytesRate(totalRx, false);
-            document.getElementById('hdrTotalTx').textContent = formatBytesRate(totalTx, false);
-            document.getElementById('hdrTotalTraffic').textContent = formatTraffic(monthBytes);
-
-            document.getElementById('mobOnlineText').textContent = `${onlineCount}/${total}`;
-            document.getElementById('mobTotalRx').textContent = formatBytesRate(totalRx, true);
-            document.getElementById('mobTotalTx').textContent = formatBytesRate(totalTx, true);
+        function computeDerivedTarget(raw) {
+            const online = isNodeOnline(raw);
+            const memPct = (online && raw.memory_total > 0) ? (raw.memory_used / raw.memory_total) * 100 : 0;
+            const swapPct = (online && raw.swap_total > 0) ? (raw.swap_used / raw.swap_total) * 100 : 0;
+            const hddPct = raw.hdd_total > 0 ? (raw.hdd_used / raw.hdd_total) * 100 : 0;
+            return {
+                cpu: online ? raw.cpu : 0,
+                memUsed: online ? raw.memory_used : 0,
+                memPct,
+                swapUsed: online ? raw.swap_used : 0,
+                swapPct,
+                hddUsed: raw.hdd_used,
+                hddPct,
+                rx: online ? raw.network_rx : 0,
+                tx: online ? raw.network_tx : 0,
+                netIn: raw.monthIn,
+                netOut: raw.monthOut,
+                load1: online ? raw.load_1 : 0,
+                pingCT: online ? raw.time_189 : 0,
+                pingCU: online ? raw.time_10010 : 0,
+                pingCM: online ? raw.time_10086 : 0,
+                tcp: online ? raw.tcp : 0,
+                udp: online ? raw.udp : 0,
+                proc: online ? raw.process : 0,
+                thread: online ? raw.thread : 0
+            };
         }
 
-        function isIssue(s) {
-            return !isOnline(s) || s.cpu >= 80;
-        }
+        function initOrUpdateNodes(list, now) {
+            const seen = new Set();
+            const label = new Date(now * 1000).toTimeString().split(' ')[0];
+            serverOrder = [];
 
-        // 分组：全部 + 各地区（多于一个地区时）+ 异常/离线
-        function renderGroupPills() {
-            const counts = {};
-            servers.forEach(s => { counts[s.location] = (counts[s.location] || 0) + 1; });
-            const regions = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
-            const groups = [['ALL', `全部节点 (${servers.length})`]];
-            if (regions.length > 1) regions.forEach(r => groups.push([r, `${regionName(r)} (${counts[r]})`]));
-            groups.push([ISSUE, `异常/离线 (${servers.filter(isIssue).length})`]);
-            if (!groups.some(g => g[0] === currentGroup)) currentGroup = 'ALL';
+            list.forEach((it, idx) => {
+                const raw = normalizeServer(it, idx, now);
+                const id = raw.id;
+                if (seen.has(id)) return;
+                seen.add(id);
+                serverOrder.push(id);
+                const tgt = computeDerivedTarget(raw);
 
-            setHtml(document.getElementById('groupPillsContainer'), groups.map(([g, label]) => {
-                const active = currentGroup === g;
-                const cls = active
-                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-medium'
-                    : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200';
-                return `<button onclick="selectGroup(this.dataset.g)" data-g="${esc(g)}" class="px-2.5 py-1 rounded-lg text-xs transition whitespace-nowrap ${cls}">${esc(label)}</button>`;
-            }).join(''));
-        }
-
-        function getFilteredServers() {
-            const q = searchQuery.trim().toLowerCase();
-            return servers.filter(s => {
-                if (currentGroup === ISSUE) {
-                    if (!isIssue(s)) return false;
-                } else if (currentGroup !== 'ALL' && s.location !== currentGroup) {
-                    return false;
+                let st = nodeStates.get(id);
+                if (!st) {
+                    st = { raw, current: { ...tgt }, target: tgt, history: { rx: [], tx: [], labels: [] } };
+                    nodeStates.set(id, st);
+                    mountNodeDomOnce(id);
+                } else {
+                    st.raw = raw;
+                    st.target = tgt;
                 }
-                if (q) {
-                    const hay = `${s.name} ${s.regionName} ${s.location} ${s.type} ${s.sys} ${s.cpuInfo}`.toLowerCase();
-                    if (!hay.includes(q)) return false;
-                }
-                return true;
+                const h = st.history;
+                h.rx.push(tgt.rx); h.tx.push(tgt.tx); h.labels.push(label);
+                if (h.rx.length > NET_POINTS) { h.rx.shift(); h.tx.shift(); h.labels.shift(); }
+                patchStaticNodeDom(id);
             });
+
+            // 主控上已删除的节点，从页面移除
+            [...nodeStates.keys()].forEach(id => {
+                if (seen.has(id)) return;
+                const ref = domRefs.get(id);
+                if (ref) { ref.trMain.remove(); ref.trDetail.remove(); ref.cardEl.remove(); }
+                domRefs.delete(id);
+                nodeStates.delete(id);
+                if (expandedId === id) expandedId = null;
+            });
+
+            updateGlobalTargets(now);
+            updateRegionCounts();
+            applySortAndFilterOrder();
         }
 
-        // 只在内容变化时才替换，避免每次刷新重建导致闪烁、悬停提示消失
-        function setHtml(el, html) {
-            if (el._html !== html) {
-                el._html = html;
-                el.innerHTML = html;
-            }
-        }
+        /* ==========================================================================
+           4. 增量 DOM：每个节点只挂载一次，之后原地更新
+           ========================================================================== */
+        function mountNodeDomOnce(id) {
+            const trMain = document.createElement('tr');
+            trMain.className = 'cursor-pointer transition-colors hover:bg-slate-200/40 dark:hover:bg-white/[0.03]';
+            trMain.onclick = () => toggleExpandNode(id);
 
-        function renderMainView() {
-            const container = document.getElementById('mainViewContainer');
-            if (!loaded) {
-                setHtml(container, `
-                    <div class="p-12 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center">
-                        <p class="text-xs text-slate-500 dark:text-slate-400">正在加载节点数据…</p>
+            trMain.innerHTML = `
+                <td class="py-2.5 pl-3.5 pr-2 whitespace-nowrap"><span data-ref="statusBadge"></span></td>
+                <td class="py-2.5 px-2.5 font-sans">
+                    <div class="flex items-center gap-2" data-ref="nameTooltip">
+                        <span data-ref="flag"></span>
+                        <span class="font-semibold text-xs truncate max-w-[140px]" data-ref="nodeName"></span>
+                        <svg data-ref="chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
-                `);
-                return;
-            }
-
-            const list = getFilteredServers();
-            if (list.length === 0) {
-                setHtml(container, `
-                    <div class="p-12 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center">
-                        <p class="text-xs text-slate-500 dark:text-slate-400">${servers.length ? '没有匹配的服务器节点' : '还没有节点接入'}</p>
-                        ${servers.length ? `<button onclick="resetFilterState()" class="mt-2.5 px-3 py-1 rounded-lg text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900">重置筛选</button>` : ''}
+                </td>
+                <td class="py-2.5 px-2 whitespace-nowrap">
+                    <span data-ref="virtBadge" class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300"></span>
+                </td>
+                <td class="py-2.5 px-2 whitespace-nowrap font-sans text-xs text-slate-500 dark:text-slate-400" data-ref="locLabel"></td>
+                <td class="py-2.5 px-2 text-right whitespace-nowrap font-sans text-xs" data-ref="uptimeText"></td>
+                <td class="py-2.5 px-2 text-right whitespace-nowrap font-semibold" data-ref="load1Text">0.00</td>
+                <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px]">
+                    <span class="text-sky-500">↓<span data-ref="rxText">0K</span></span>
+                    <span class="text-slate-300 dark:text-slate-700 mx-0.5">/</span>
+                    <span class="text-emerald-500">↑<span data-ref="txText">0K</span></span>
+                </td>
+                <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400 hidden lg:table-cell" data-ref="trafficCell">
+                    <span data-ref="netInText">0M</span> <span class="opacity-40">|</span> <span data-ref="netOutText">0M</span>
+                </td>
+                <td class="py-2.5 px-2.5 text-center whitespace-nowrap text-[11px] hidden xl:table-cell">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.04] border border-slate-200/70 dark:border-white/[0.05]">
+                        <span class="text-[#3B82F6] font-medium" data-ref="pingCT">-</span>
+                        <span class="opacity-30">/</span>
+                        <span class="text-[#F59E0B] font-medium" data-ref="pingCU">-</span>
+                        <span class="opacity-30">/</span>
+                        <span class="text-[#10B981] font-medium" data-ref="pingCM">-</span>
+                    </span>
+                </td>
+                <td class="py-2.5 px-2">
+                    <div class="ss-capsule">
+                        <div data-ref="cpuBar" class="ss-capsule-fill" style="width:0%"></div>
+                        <span data-ref="cpuLabel" class="ss-capsule-text">0%</span>
                     </div>
-                `);
-                return;
-            }
-
-            setHtml(container, currentView === 'table' ? renderClassicTable(list) : renderCards(list));
-
-            if (expandedServerId) {
-                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
-            }
-        }
-
-        function renderClassicTable(list) {
-            return `
-                <div class="rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#111827] overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-slate-200/80 dark:border-slate-800/90 bg-slate-50/90 dark:bg-slate-900/70 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
-                                    <th class="py-2.5 pl-3.5 pr-2 w-20">状态</th>
-                                    <th class="py-2.5 px-2.5 min-w-[175px]">节点</th>
-                                    <th class="py-2.5 px-2 w-28">虚拟化 / 系统</th>
-                                    <th class="py-2.5 px-2 w-20 text-right">在线</th>
-                                    <th class="py-2.5 px-2 w-16 text-right">负载</th>
-                                    <th class="py-2.5 px-2.5 w-32 text-right">网络速率 (↓/↑)</th>
-                                    <th class="py-2.5 px-2.5 w-28 text-right hidden lg:table-cell">月流量 (↓/↑)</th>
-                                    <th class="py-2.5 px-2 w-28 text-center">CPU</th>
-                                    <th class="py-2.5 px-2 w-32 text-center">内存 <span class="text-[9px] font-normal text-slate-400">(含Swap)</span></th>
-                                    <th class="py-2.5 px-2 w-28 text-center hidden md:table-cell">硬盘</th>
-                                    <th class="py-2.5 pl-2 pr-3.5 w-32 text-right hidden xl:table-cell">三网 (电/联/移)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200/60 dark:divide-slate-800/70 text-xs font-mono tabular-nums">
-                                ${list.map(s => renderTableRowAndAccordion(s)).join('')}
-                            </tbody>
-                        </table>
+                </td>
+                <td class="py-2.5 px-2">
+                    <div class="ss-capsule">
+                        <div data-ref="memBar" class="ss-capsule-fill" style="width:0%"></div>
+                        <span data-ref="memLabel" class="ss-capsule-text">0%</span>
+                        <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/25">
+                            <div data-ref="swapBar" class="h-full bg-indigo-400" style="width:0%"></div>
+                        </div>
                     </div>
-                </div>
+                </td>
+                <td class="py-2.5 pl-2 pr-3.5 hidden md:table-cell">
+                    <div class="ss-capsule">
+                        <div data-ref="hddBar" class="ss-capsule-fill" style="width:0%"></div>
+                        <span data-ref="hddLabel" class="ss-capsule-text">0%</span>
+                    </div>
+                </td>
             `;
-        }
 
-        function renderTableRowAndAccordion(s) {
-            const online = isOnline(s);
-            const isExpanded = expandedServerId === s.id;
-            const ramPct = online ? pct(s.memory_used, s.memory_total) : 0;
-            const swapPct = online ? pct(s.swap_used, s.swap_total) : 0;
-            const hddPct = pct(s.hdd_used, s.hdd_total);
+            const trDetail = document.createElement('tr');
+            trDetail.style.backgroundColor = 'var(--bg-drawer)';
+            trDetail.innerHTML = `
+                <td colspan="12" class="p-0 border-b border-slate-200/60 dark:border-white/[0.05]">
+                    <div data-ref="drawerGrid" class="drawer-grid">
+                        <div class="drawer-inner">
+                            <div class="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 font-sans">
+                                <!-- 左：系统信息、t/u/p/d、明细 -->
+                                <div class="lg:col-span-5 surface-card rounded-xl p-4 flex flex-col justify-between space-y-3.5">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 truncate" data-ref="osBadge"></span>
+                                            <span class="text-[11px] font-mono text-slate-400 shrink-0">Load: <strong class="text-slate-700 dark:text-slate-200" data-ref="loadTriple">0.00</strong></span>
+                                        </div>
+                                        <p class="text-xs font-mono text-slate-600 dark:text-slate-300 truncate" data-ref="customSpec"></p>
+                                    </div>
 
-            let statusBadge;
-            if (!online) {
-                statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">OFFLINE</span>`;
-            } else {
-                const label = s.online4 && s.online6 ? 'v4/v6' : (s.online6 ? 'IPv6' : 'IPv4');
-                statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${label}</span>`;
-            }
+                                    <div class="grid grid-cols-4 gap-2 font-mono tabular-nums">
+                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
+                                            <div class="text-[10px] text-slate-400">TCP (t)</div>
+                                            <div class="text-xs font-bold mt-0.5" data-ref="tcpVal">0</div>
+                                        </div>
+                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
+                                            <div class="text-[10px] text-slate-400">UDP (u)</div>
+                                            <div class="text-xs font-bold mt-0.5" data-ref="udpVal">0</div>
+                                        </div>
+                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
+                                            <div class="text-[10px] text-slate-400">进程 (p)</div>
+                                            <div class="text-xs font-bold mt-0.5" data-ref="procVal">0</div>
+                                        </div>
+                                        <div class="p-2 rounded-lg bg-slate-100/80 dark:bg-black/25 border border-slate-200/70 dark:border-white/[0.06] text-center">
+                                            <div class="text-[10px] text-slate-400">线程 (d)</div>
+                                            <div class="text-xs font-bold mt-0.5" data-ref="threadVal">0</div>
+                                        </div>
+                                    </div>
 
-            const cpuText = online ? `${s.cpu}%` : '-';
-            const ramText = !online ? '-' : (barShowCapacity ? formatRamCap(s.memory_used, s.memory_total) : `${ramPct}%`);
-            const hddText = barShowCapacity ? `${formatGB(s.hdd_used)}/${formatGB(s.hdd_total)}G` : `${hddPct}%`;
+                                    <div class="space-y-2 text-[11px] font-mono tabular-nums">
+                                        <div class="flex justify-between gap-3">
+                                            <span class="text-slate-400 font-sans shrink-0">内存 / Swap</span>
+                                            <span class="text-right" data-ref="detailMemSwapText">-</span>
+                                        </div>
+                                        <div class="flex justify-between gap-3">
+                                            <span class="text-slate-400 font-sans shrink-0">三网丢包 (电信 / 联通 / 移动)</span>
+                                            <span class="text-right" data-ref="detailLossText">-</span>
+                                        </div>
+                                        <div class="flex justify-between gap-3">
+                                            <span class="text-slate-400 font-sans shrink-0">磁盘 IO</span>
+                                            <span class="text-right" data-ref="detailIoText">-</span>
+                                        </div>
+                                        <div class="flex justify-between gap-3">
+                                            <span class="text-slate-400 font-sans shrink-0">启动时间</span>
+                                            <span class="text-right" data-ref="detailBootText">-</span>
+                                        </div>
+                                        <div class="flex justify-between gap-3">
+                                            <span class="text-slate-400 font-sans shrink-0">本月流量 / 累计</span>
+                                            <span class="text-right" data-ref="detailTrafficText">-</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-            const rowHighlight = isExpanded
-                ? 'bg-slate-100/90 dark:bg-[#161f30]'
-                : 'hover:bg-slate-50/90 dark:hover:bg-[#161f30]/70';
+                                <!-- 右：曲线 -->
+                                <div class="lg:col-span-7 surface-card rounded-xl p-4 flex flex-col justify-between">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                        <div class="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-black/30 border border-slate-200/70 dark:border-white/[0.06] text-xs">
+                                            <button type="button" data-ref="tabPingBtn" onclick="event.stopPropagation(); switchChartTabMode('ping')" class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer">三网 24 小时延迟 (ms)</button>
+                                            <button type="button" data-ref="tabNetBtn" onclick="event.stopPropagation(); switchChartTabMode('net')" class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer">实时网络吞吐 (↓/↑)</button>
+                                        </div>
+                                        <div data-ref="chartLegend" class="flex flex-wrap items-center gap-3 text-[11px] font-mono tabular-nums"></div>
+                                    </div>
+                                    <div class="relative w-full h-44 select-none">
+                                        <canvas data-ref="detailCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            `;
 
-            return `
-                <tr onclick="toggleExpandRow('${esc(s.id)}')" class="cursor-pointer transition-colors ${rowHighlight} ${!online ? 'opacity-75' : ''}">
-                    <td class="py-2.5 pl-3.5 pr-2 whitespace-nowrap">
-                        ${statusBadge}
-                    </td>
-
-                    <td class="py-2.5 px-2.5 font-sans">
-                        <div class="flex items-center gap-2">
-                            ${renderFlagBadge(s.location)}
+            const cardEl = document.createElement('div');
+            cardEl.className = 'surface-card rounded-xl p-4 cursor-pointer hover:border-emerald-500/40 transition flex flex-col justify-between';
+            cardEl.onclick = () => toggleExpandNode(id);
+            cardEl.innerHTML = `
+                <div>
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span data-ref="cFlag"></span>
                             <div class="min-w-0">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate">${esc(s.name)}</span>
-                                    <svg class="w-3 h-3 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-emerald-500' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                                </div>
-                                <div class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[165px]">${esc(s.regionName)}</div>
+                                <h3 class="font-semibold text-sm truncate" data-ref="cName"></h3>
+                                <p class="text-[11px] text-slate-400 truncate" data-ref="cSub"></p>
                             </div>
                         </div>
-                    </td>
-
-                    <td class="py-2.5 px-2 whitespace-nowrap">
-                        <div class="flex items-center gap-1.5">
-                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">${esc(s.type)}</span>
-                            <span class="text-[11px] text-slate-500 dark:text-slate-400 font-sans" title="${s.sys}">${s.os}</span>
-                        </div>
-                    </td>
-
-                    <td class="py-2.5 px-2 text-right whitespace-nowrap font-sans text-xs ${online ? 'text-slate-700 dark:text-slate-300' : 'text-rose-500 font-medium'}">
-                        ${online ? esc(s.uptime) : '离线'}
-                    </td>
-
-                    <td class="py-2.5 px-2 text-right whitespace-nowrap" title="1 分钟负载">
-                        <span class="${s.load_1 >= 1.5 ? 'text-amber-500 font-semibold' : 'text-slate-700 dark:text-slate-300'}">${online ? s.load_1.toFixed(2) : '-'}</span>
-                    </td>
-
-                    <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px]">
-                        <div class="flex items-center justify-end gap-1.5">
-                            <span class="text-emerald-600 dark:text-emerald-400">↓${online ? formatBytesRate(s.network_rx, true) : '0K'}</span>
-                            <span class="text-slate-300 dark:text-slate-700">/</span>
-                            <span class="text-sky-600 dark:text-sky-400">↑${online ? formatBytesRate(s.network_tx, true) : '0K'}</span>
-                        </div>
-                    </td>
-
-                    <td class="py-2.5 px-2.5 text-right whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400 hidden lg:table-cell" title="累计 ↓${formatTraffic(s.network_in)} / ↑${formatTraffic(s.network_out)}">
-                        ${formatTraffic(s.month_in)} / ${formatTraffic(s.month_out)}
-                    </td>
-
-                    <td class="py-2.5 px-2">
-                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="CPU: ${s.cpu}% (${s.cpuInfo})">
-                            <div class="h-full ${getCapsuleColorClass(s.cpu, online)} ss-bar-fill" style="width: ${online ? Math.min(100, s.cpu) : 0}%"></div>
-                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${cpuText}</span>
-                        </div>
-                    </td>
-
-                    <td class="py-2.5 px-2">
-                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="内存: ${s.memory_used.toFixed(0)} MB / ${s.memory_total.toFixed(0)} MB | Swap: ${s.swap_used.toFixed(0)} MB / ${s.swap_total.toFixed(0)} MB (${swapPct}%)">
-                            <div class="h-full ${getCapsuleColorClass(ramPct, online)} ss-bar-fill" style="width: ${ramPct}%"></div>
-                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${ramText}</span>
-                            <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/20">
-                                <div class="h-full bg-indigo-400 ss-bar-fill" style="width: ${swapPct}%"></div>
-                            </div>
-                        </div>
-                    </td>
-
-                    <td class="py-2.5 px-2 hidden md:table-cell">
-                        <div class="relative w-full h-5 rounded-md bg-slate-200/80 dark:bg-slate-800/90 overflow-hidden select-none" title="硬盘: ${s.hdd_used.toFixed(1)} GB / ${s.hdd_total.toFixed(1)} GB">
-                            <div class="h-full ${getCapsuleColorClass(hddPct, online)} ss-bar-fill" style="width: ${hddPct}%"></div>
-                            <span class="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-900 dark:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">${hddText}</span>
-                        </div>
-                    </td>
-
-                    <td class="py-2.5 pl-2 pr-3.5 text-right whitespace-nowrap text-[11px] hidden xl:table-cell">
-                        ${online ? `
-                            <span class="${getPingClass(s.time_189)}">${pingText(s.time_189)}</span>
-                            <span class="text-slate-300 dark:text-slate-700">/</span>
-                            <span class="${getPingClass(s.time_10010)}">${pingText(s.time_10010)}</span>
-                            <span class="text-slate-300 dark:text-slate-700">/</span>
-                            <span class="${getPingClass(s.time_10086)}">${pingText(s.time_10086)}</span>
-                            <span class="text-[10px] text-slate-400">ms</span>
-                        ` : `<span class="text-rose-500">TIMEOUT</span>`}
-                    </td>
-                </tr>
-                ${isExpanded ? `
-                <tr class="bg-slate-50/90 dark:bg-[#0e1420] border-b border-slate-200 dark:border-slate-800">
-                    <td colspan="11" class="p-0">
-                        ${renderExpandedDetailPanel(s)}
-                    </td>
-                </tr>
-                ` : ''}
-            `;
-        }
-
-        function renderExpandedDetailPanel(s) {
-            const online = isOnline(s);
-            const swapPct = pct(s.swap_used, s.swap_total);
-
-            return `
-                <div class="accordion-content p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 font-sans">
-
-                    <!-- 左：硬件信息、t/u/p/d、本月流量 -->
-                    <div class="lg:col-span-5 flex flex-col justify-between space-y-3.5 bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90">
-                        <div class="space-y-2.5 text-xs">
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                                <span class="text-slate-400 shrink-0">处理器</span>
-                                <span class="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate" title="${s.cpuInfo}">${s.cpuInfo}</span>
-                            </div>
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                                <span class="text-slate-400 shrink-0">系统 / 架构</span>
-                                <span class="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 truncate" title="${s.sys}">${s.sys}</span>
-                            </div>
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                                <span class="text-slate-400 shrink-0">内存 / Swap</span>
-                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
-                                    ${s.memory_used.toFixed(0)} / ${s.memory_total.toFixed(0)} MB · Swap ${s.swap_used.toFixed(0)}/${s.swap_total.toFixed(0)}M (${swapPct}%)
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                                <span class="text-slate-400 shrink-0">硬盘 / 负载</span>
-                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
-                                    ${s.hdd_used.toFixed(1)}/${s.hdd_total.toFixed(1)} GB · Load ${online ? s.load_1.toFixed(2) : '-'}
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                                <span class="text-slate-400 shrink-0">磁盘 IO</span>
-                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
-                                    读 ${online ? formatBytesRate(s.io_read) : '-'} · 写 ${online ? formatBytesRate(s.io_write) : '-'}
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between gap-3">
-                                <span class="text-slate-400 shrink-0">启动时间</span>
-                                <span class="font-mono text-[11px] tabular-nums text-slate-800 dark:text-slate-200 text-right">
-                                    ${online ? formatTime(s.boot_time) : '-'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-4 gap-2 pt-1 font-mono tabular-nums">
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
-                                <div class="text-[10px] text-slate-400">TCP (t)</div>
-                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.tcp_count}</div>
-                            </div>
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
-                                <div class="text-[10px] text-slate-400">UDP (u)</div>
-                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.udp_count}</div>
-                            </div>
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
-                                <div class="text-[10px] text-slate-400">进程 (p)</div>
-                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.process_count}</div>
-                            </div>
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/90 border border-slate-200/70 dark:border-slate-800 text-center">
-                                <div class="text-[10px] text-slate-400">线程 (d)</div>
-                                <div class="text-xs font-semibold text-slate-800 dark:text-slate-100 mt-0.5">${s.thread_count}</div>
-                            </div>
-                        </div>
-
-                        <div class="pt-1 flex items-center justify-between text-[11px] font-mono tabular-nums">
-                            <span class="text-slate-400 font-sans">本月流量</span>
-                            <span class="text-slate-700 dark:text-slate-300 font-medium">
-                                <span class="text-emerald-600 dark:text-emerald-400">↓${formatTraffic(s.month_in)}</span>
-                                <span class="text-sky-600 dark:text-sky-400 ml-1.5">↑${formatTraffic(s.month_out)}</span>
-                                <span class="text-slate-400 ml-2">累计 ↓${formatTraffic(s.network_in)} ↑${formatTraffic(s.network_out)}</span>
-                            </span>
-                        </div>
+                        <span data-ref="cStatus" class="shrink-0"></span>
                     </div>
 
-                    <!-- 右：三网 24 小时延迟 / 实时吞吐 -->
-                    <div class="lg:col-span-7 bg-white dark:bg-[#111827] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90 flex flex-col justify-between">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                            <div class="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 text-xs">
-                                <button onclick="event.stopPropagation(); switchChartTab('ping')" class="px-2.5 py-1 rounded-md font-medium transition ${activeChartTab === 'ping' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}">
-                                    三网 24 小时延迟
-                                </button>
-                                <button onclick="event.stopPropagation(); switchChartTab('net')" class="px-2.5 py-1 rounded-md font-medium transition ${activeChartTab === 'net' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}">
-                                    实时吞吐 (RX/TX)
-                                </button>
+                    <div class="mt-3.5 space-y-2 font-mono tabular-nums text-[11px]">
+                        <div class="grid grid-cols-12 items-center gap-2">
+                            <span class="col-span-2 text-slate-400 font-sans">CPU</span>
+                            <div class="col-span-10 ss-capsule">
+                                <div data-ref="cCpuBar" class="ss-capsule-fill" style="width:0%"></div>
+                                <span data-ref="cCpuLabel" class="ss-capsule-text">0%</span>
                             </div>
-
-                            ${activeChartTab === 'ping' ? `
-                                <div class="flex flex-wrap items-center gap-3 text-[11px] font-mono tabular-nums" title="当前延迟（丢包率）">
-                                    <span class="inline-flex items-center gap-1 text-blue-500">
-                                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                        电信: <strong>${online && s.time_189 > 0 ? s.time_189 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_189)})</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1 text-amber-500">
-                                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                        联通: <strong>${online && s.time_10010 > 0 ? s.time_10010 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_10010)})</span>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1 text-emerald-500">
-                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                        移动: <strong>${online && s.time_10086 > 0 ? s.time_10086 + 'ms' : '超时'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(s.loss_10086)})</span>
-                                    </span>
-                                </div>
-                            ` : `
-                                <div class="flex items-center gap-3 text-[11px] font-mono tabular-nums">
-                                    <span class="inline-flex items-center gap-1 text-emerald-500">
-                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                        下行 RX: <strong>${formatBytesRate(online ? s.network_rx : 0, false)}</strong>
-                                    </span>
-                                    <span class="inline-flex items-center gap-1 text-sky-500">
-                                        <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                                        上行 TX: <strong>${formatBytesRate(online ? s.network_tx : 0, false)}</strong>
-                                    </span>
-                                </div>
-                            `}
                         </div>
-
-                        <div class="relative w-full h-40">
-                            <canvas id="canvas-${esc(s.id)}" class="w-full h-full block"></canvas>
+                        <div class="grid grid-cols-12 items-center gap-2">
+                            <span class="col-span-2 text-slate-400 font-sans">内存</span>
+                            <div class="col-span-10 ss-capsule">
+                                <div data-ref="cMemBar" class="ss-capsule-fill" style="width:0%"></div>
+                                <span data-ref="cMemLabel" class="ss-capsule-text">0%</span>
+                                <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-black/25">
+                                    <div data-ref="cSwapBar" class="h-full bg-indigo-400" style="width:0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-12 items-center gap-2">
+                            <span class="col-span-2 text-slate-400 font-sans">硬盘</span>
+                            <div class="col-span-10 ss-capsule">
+                                <div data-ref="cHddBar" class="ss-capsule-fill" style="width:0%"></div>
+                                <span data-ref="cHddLabel" class="ss-capsule-text">0%</span>
+                            </div>
                         </div>
                     </div>
+                </div>
 
+                <div class="mt-3.5 pt-2.5 border-t border-slate-200/70 dark:border-white/[0.06] flex items-center justify-between text-[11px] font-mono tabular-nums">
+                    <div>
+                        <span class="text-sky-500">↓<span data-ref="cRx">0K</span></span>
+                        <span class="text-emerald-500 ml-1">↑<span data-ref="cTx">0K</span></span>
+                    </div>
+                    <div class="text-slate-400">t/u/p/d: <span class="text-slate-600 dark:text-slate-300" data-ref="cTupd">0/0/0/0</span></div>
+                    <div data-ref="cPing"></div>
+                </div>
+
+                <div data-ref="cDrawerGrid" class="drawer-grid cursor-default" onclick="event.stopPropagation()">
+                    <div class="drawer-inner">
+                        <div class="pt-3 mt-3 border-t border-slate-200/70 dark:border-white/[0.06] space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-black/30 border border-slate-200/70 dark:border-white/[0.06] text-[11px]">
+                                    <button type="button" data-ref="cTabPingBtn" onclick="switchChartTabMode('ping')" class="px-2 py-0.5 rounded-md font-medium transition cursor-pointer">三网 24h</button>
+                                    <button type="button" data-ref="cTabNetBtn" onclick="switchChartTabMode('net')" class="px-2 py-0.5 rounded-md font-medium transition cursor-pointer">实时吞吐</button>
+                                </div>
+                                <span class="text-[10px] font-mono text-slate-400 truncate" data-ref="cSpec"></span>
+                            </div>
+                            <div class="h-36 w-full relative">
+                                <canvas data-ref="cardCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
+
+            document.getElementById('serverTableBody').appendChild(trMain);
+            document.getElementById('serverTableBody').appendChild(trDetail);
+            document.getElementById('cardViewWrapper').appendChild(cardEl);
+
+            const ref = { trMain, trDetail, cardEl };
+            [trMain, trDetail, cardEl].forEach(root => {
+                root.querySelectorAll('[data-ref]').forEach(el => { ref[el.dataset.ref] = el; });
+            });
+            bindMagneticCrosshair(ref.detailCanvas);
+            bindMagneticCrosshair(ref.cardCanvas);
+            domRefs.set(id, ref);
+
+            syncAccordionClass(id);
         }
 
-        function renderCards(list) {
-            return `
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    ${list.map(s => {
-                        const online = isOnline(s);
-                        const isExpanded = expandedServerId === s.id;
-                        const ramPct = online ? pct(s.memory_used, s.memory_total) : 0;
-                        const swapPct = online ? pct(s.swap_used, s.swap_total) : 0;
-                        const hddPct = pct(s.hdd_used, s.hdd_total);
+        // 不需要插值的字段：名称、状态、系统信息等，每次拉取后更新
+        function patchStaticNodeDom(id) {
+            const st = nodeStates.get(id);
+            const ref = domRefs.get(id);
+            if (!st || !ref) return;
+            const raw = st.raw;
+            const online = isNodeOnline(raw);
 
-                        return `
-                            <div onclick="toggleExpandRow('${esc(s.id)}')" class="cursor-pointer rounded-xl border ${isExpanded ? 'border-emerald-500/50 dark:border-emerald-500/50 md:col-span-2 xl:col-span-3' : 'border-slate-200/90 dark:border-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700'} bg-white dark:bg-[#111827] p-4 transition-all flex flex-col justify-between ${!online ? 'opacity-75' : ''}">
-                                <div>
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="flex items-center gap-2 min-w-0">
-                                            ${renderFlagBadge(s.location)}
-                                            <div class="min-w-0">
-                                                <h3 class="font-semibold text-sm text-slate-900 dark:text-white truncate">${esc(s.name)}</h3>
-                                                <p class="text-[11px] text-slate-400 truncate">${esc(s.regionName)} · ${s.os}</p>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
-                                            <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">${esc(s.type)}</span>
-                                            ${online
-                                                ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">${esc(s.uptime)}</span>`
-                                                : `<span class="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-semibold">OFFLINE</span>`
-                                            }
-                                        </div>
-                                    </div>
+            if (!online) {
+                setHtml(ref.statusBadge, `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">OFFLINE</span>`);
+                setHtml(ref.cStatus, `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/15 text-rose-500">OFFLINE</span>`);
+            } else {
+                const proto = raw.online4 && raw.online6 ? 'v4/v6' : (raw.online6 ? 'IPv6' : 'IPv4');
+                setHtml(ref.statusBadge, `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/25"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${proto}</span>`);
+                setHtml(ref.cStatus, `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-500">${esc(raw.uptime)}</span>`);
+            }
+            ref.trMain.classList.toggle('opacity-75', !online);
+            ref.cardEl.classList.toggle('opacity-75', !online);
 
-                                    <div class="mt-4 space-y-2 font-mono tabular-nums text-[11px]">
-                                        <div class="grid grid-cols-12 items-center gap-2">
-                                            <span class="col-span-2 text-slate-400 font-sans">CPU</span>
-                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                <div class="h-full ${getCapsuleColorClass(s.cpu, online)} ss-bar-fill" style="width:${online ? Math.min(100, s.cpu) : 0}%"></div>
-                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? s.cpu + '%' : '-'}</span>
-                                            </div>
-                                        </div>
-                                        <div class="grid grid-cols-12 items-center gap-2">
-                                            <span class="col-span-2 text-slate-400 font-sans">内存</span>
-                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                <div class="h-full ${getCapsuleColorClass(ramPct, online)} ss-bar-fill" style="width:${ramPct}%"></div>
-                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? `${ramPct}% (${formatRamCap(s.memory_used, s.memory_total)})` : '-'}</span>
-                                            </div>
-                                        </div>
-                                        <div class="grid grid-cols-12 items-center gap-2">
-                                            <span class="col-span-2 text-slate-400 font-sans">Swap</span>
-                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                <div class="h-full bg-indigo-500/80 ss-bar-fill" style="width:${swapPct}%"></div>
-                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${online ? (s.swap_total > 0 ? `${swapPct}% (${s.swap_used.toFixed(0)}/${s.swap_total.toFixed(0)}M)` : '未启用') : '-'}</span>
-                                            </div>
-                                        </div>
-                                        <div class="grid grid-cols-12 items-center gap-2">
-                                            <span class="col-span-2 text-slate-400 font-sans">硬盘</span>
-                                            <div class="col-span-10 relative h-4 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                <div class="h-full ${getCapsuleColorClass(hddPct, online)} ss-bar-fill" style="width:${hddPct}%"></div>
-                                                <span class="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-slate-900 dark:text-white">${hddPct}% (${formatGB(s.hdd_used)}/${formatGB(s.hdd_total)}G)</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+            const flag = getFlagBadgeHtml(raw.location);
+            setHtml(ref.flag, flag);
+            setHtml(ref.cFlag, flag);
+            setText(ref.nodeName, raw.name);
+            setText(ref.cName, raw.name);
+            ref.nameTooltip.title = `${raw.cpuInfo}\n${raw.sys}`;
+            setText(ref.virtBadge, raw.type);
+            setText(ref.locLabel, raw.locationLabel);
+            setText(ref.cSub, `${raw.locationLabel} · ${raw.type} · ${raw.os.split(' ')[0]}`);
+            setText(ref.uptimeText, raw.uptime);
+            ref.uptimeText.classList.toggle('text-rose-500', !online);
+            ref.uptimeText.classList.toggle('font-semibold', !online);
+            ref.trafficCell.title = `累计 ↓${formatTraffic(raw.network_in, true)} / ↑${formatTraffic(raw.network_out, true)}`;
 
-                                <div class="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] font-mono tabular-nums">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-emerald-600 dark:text-emerald-400">↓${online ? formatBytesRate(s.network_rx, true) : '0K'}</span>
-                                        <span class="text-sky-600 dark:text-sky-400">↑${online ? formatBytesRate(s.network_tx, true) : '0K'}</span>
-                                    </div>
-                                    <div class="text-slate-400">
-                                        t/u/p/d: <span class="text-slate-700 dark:text-slate-300">${s.tcp_count}/${s.udp_count}/${s.process_count}/${s.thread_count}</span>
-                                    </div>
-                                    <div>
-                                        ${online
-                                            ? `<span class="${getPingClass(s.time_189)}">${pingText(s.time_189)}</span>/<span class="${getPingClass(s.time_10010)}">${pingText(s.time_10010)}</span>/<span class="${getPingClass(s.time_10086)}">${pingText(s.time_10086)}</span>ms`
-                                            : `<span class="text-rose-500">离线</span>`
-                                        }
-                                    </div>
-                                </div>
+            setText(ref.osBadge, raw.sys);
+            ref.osBadge.title = raw.sys;
+            setText(ref.customSpec, raw.cpuInfo);
+            ref.customSpec.title = raw.cpuInfo;
+            setText(ref.cSpec, raw.cpuInfo);
+            setText(ref.detailLossText, online ? `${fmtLoss(raw.ping_189)} / ${fmtLoss(raw.ping_10010)} / ${fmtLoss(raw.ping_10086)}` : '-');
+            setText(ref.detailIoText, online ? `读 ${formatSpeed(raw.io_read, false, 'byte')} · 写 ${formatSpeed(raw.io_write, false, 'byte')}` : '-');
+            setText(ref.detailBootText, online ? formatTime(raw.boot_time) : '-');
+            setText(ref.detailTrafficText, `↓${formatTraffic(raw.monthIn, true)} ↑${formatTraffic(raw.monthOut, true)} / ↓${formatTraffic(raw.network_in, true)} ↑${formatTraffic(raw.network_out, true)}`);
+        }
 
-                                ${isExpanded ? `
-                                    <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 cursor-default" onclick="event.stopPropagation()">
-                                        ${renderExpandedDetailPanel(s)}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
+        function syncAccordionClass(id) {
+            const ref = domRefs.get(id);
+            if (!ref) return;
+            const isOpen = expandedId === id;
+            ref.drawerGrid.classList.toggle('is-open', isOpen);
+            ref.cDrawerGrid.classList.toggle('is-open', isOpen);
+            ref.chevron.classList.toggle('rotate-180', isOpen);
+            ref.chevron.classList.toggle('text-emerald-500', isOpen);
+            ref.cardEl.classList.toggle('border-emerald-500/50', isOpen);
+
+            const activeTabCls = 'rounded-md font-medium transition cursor-pointer bg-white dark:bg-[#1E2230] text-slate-900 dark:text-white shadow-sm';
+            const inactiveTabCls = 'rounded-md font-medium transition cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200';
+            ref.tabPingBtn.className = 'px-2.5 py-1 ' + (chartTab === 'ping' ? activeTabCls : inactiveTabCls);
+            ref.tabNetBtn.className = 'px-2.5 py-1 ' + (chartTab === 'net' ? activeTabCls : inactiveTabCls);
+            ref.cTabPingBtn.className = 'px-2 py-0.5 ' + (chartTab === 'ping' ? activeTabCls : inactiveTabCls);
+            ref.cTabNetBtn.className = 'px-2 py-0.5 ' + (chartTab === 'net' ? activeTabCls : inactiveTabCls);
+        }
+
+        /* ==========================================================================
+           5. 动画循环：数值向目标值平滑过渡
+           ========================================================================== */
+        function stepPhysicsLoop(now) {
+            const dt = Math.min(0.1, Math.max(0.001, (now - lastFrameTime) / 1000));
+            lastFrameTime = now;
+            const damp = 1 - Math.exp(-10 * dt);
+
+            globalPhysics.curRx += (globalPhysics.tgtRx - globalPhysics.curRx) * damp;
+            globalPhysics.curTx += (globalPhysics.tgtTx - globalPhysics.curTx) * damp;
+            globalPhysics.curTraffic += (globalPhysics.tgtTraffic - globalPhysics.curTraffic) * damp;
+
+            setText(document.getElementById('sumTotalRx'), formatSpeed(globalPhysics.curRx, false));
+            setText(document.getElementById('sumTotalTx'), formatSpeed(globalPhysics.curTx, false));
+            setText(document.getElementById('sumTotalTraffic'), formatTraffic(globalPhysics.curTraffic, true));
+            setText(document.getElementById('mobRx'), formatSpeed(globalPhysics.curRx, true));
+            setText(document.getElementById('mobTx'), formatSpeed(globalPhysics.curTx, true));
+
+            nodeStates.forEach((st, id) => {
+                const cur = st.current;
+                const tgt = st.target;
+                const raw = st.raw;
+                const online = isNodeOnline(raw);
+                const ref = domRefs.get(id);
+                if (!ref) return;
+
+                for (const k in tgt) cur[k] += (tgt[k] - cur[k]) * damp;
+
+                setText(ref.load1Text, online ? cur.load1.toFixed(2) : '-');
+                setStyle(ref.load1Text, 'color', !online ? '' : (cur.load1 >= 1.8 ? '#EF4444' : (cur.load1 >= 1.0 ? '#F59E0B' : '')));
+
+                const rxStr = online ? formatSpeed(cur.rx, true) : '0K';
+                const txStr = online ? formatSpeed(cur.tx, true) : '0K';
+                setText(ref.rxText, rxStr);
+                setText(ref.txText, txStr);
+                setText(ref.cRx, rxStr);
+                setText(ref.cTx, txStr);
+                setText(ref.netInText, `↓${formatTraffic(cur.netIn)}`);
+                setText(ref.netOutText, `↑${formatTraffic(cur.netOut)}`);
+
+                // 延迟为 0 表示尚无探测结果
+                const pingStr = (c, t) => (online && t > 0) ? `${Math.round(c)}` : '-';
+                const ctStr = pingStr(cur.pingCT, tgt.pingCT);
+                const cuStr = pingStr(cur.pingCU, tgt.pingCU);
+                const cmStr = pingStr(cur.pingCM, tgt.pingCM);
+                setText(ref.pingCT, ctStr);
+                setText(ref.pingCU, cuStr);
+                setText(ref.pingCM, cmStr);
+                setHtml(ref.cPing, online
+                    ? `<span class="text-[#3B82F6]">${ctStr}</span>/<span class="text-[#F59E0B]">${cuStr}</span>/<span class="text-[#10B981]">${cmStr}</span>ms`
+                    : `<span class="text-rose-500">离线</span>`);
+
+                const cpuW = Math.min(100, Math.max(0, cur.cpu));
+                const memW = Math.min(100, Math.max(0, cur.memPct));
+                const swapW = Math.min(100, Math.max(0, cur.swapPct));
+                const hddW = Math.min(100, Math.max(0, cur.hddPct));
+                const cpuColor = getCapsuleColor(cpuW, online);
+                const memColor = getCapsuleColor(memW, online);
+                const hddColor = getCapsuleColor(hddW, online);
+
+                [[ref.cpuBar, ref.cCpuBar, cpuW, cpuColor], [ref.memBar, ref.cMemBar, memW, memColor], [ref.hddBar, ref.cHddBar, hddW, hddColor]].forEach(([a, b, w, c]) => {
+                    const wStr = `${w.toFixed(1)}%`;
+                    setStyle(a, 'width', wStr); setStyle(a, 'backgroundColor', c);
+                    setStyle(b, 'width', wStr); setStyle(b, 'backgroundColor', c);
+                });
+                setStyle(ref.swapBar, 'width', `${swapW.toFixed(1)}%`);
+                setStyle(ref.cSwapBar, 'width', `${swapW.toFixed(1)}%`);
+
+                const cpuLbl = online ? `${Math.round(cpuW)}%` : '-';
+                const memLbl = !online ? '-' : (prefs.barMode === 'cap' ? formatGiBFromKiB(cur.memUsed, raw.memory_total) : `${Math.round(memW)}%`);
+                const hddLbl = prefs.barMode === 'cap' ? formatGiBFromMiB(cur.hddUsed, raw.hdd_total) : `${Math.round(hddW)}%`;
+                setText(ref.cpuLabel, cpuLbl);
+                setText(ref.cCpuLabel, cpuLbl);
+                setText(ref.memLabel, memLbl);
+                setText(ref.cMemLabel, memLbl);
+                setText(ref.hddLabel, hddLbl);
+                setText(ref.cHddLabel, hddLbl);
+
+                const tInt = Math.round(cur.tcp), uInt = Math.round(cur.udp), pInt = Math.round(cur.proc), dInt = Math.round(cur.thread);
+                setText(ref.cTupd, `${tInt}/${uInt}/${pInt}/${dInt}`);
+
+                if (expandedId === id) {
+                    setText(ref.loadTriple, online ? cur.load1.toFixed(2) : '-');
+                    setText(ref.tcpVal, String(tInt));
+                    setText(ref.udpVal, String(uInt));
+                    setText(ref.procVal, String(pInt));
+                    setText(ref.threadVal, String(dInt));
+
+                    const memUsedG = (cur.memUsed / 1048576).toFixed(2);
+                    const memTotG = (raw.memory_total / 1048576).toFixed(1);
+                    const swapUsedM = Math.round(cur.swapUsed / 1024);
+                    const swapTotM = Math.round(raw.swap_total / 1024);
+                    setText(ref.detailMemSwapText, `${memUsedG} / ${memTotG} GiB (Swap ${swapUsedM}/${swapTotM} MiB)`);
+
+                    if (chartTab === 'ping') {
+                        const item = (color, name, str, loss) =>
+                            `<span class="inline-flex items-center gap-1" style="color:${color}"><span class="w-2 h-2 rounded-full" style="background:${color}"></span>${name}: <strong>${str === '-' ? '-' : str + 'ms'}</strong> <span class="text-[10px] text-slate-400">(${fmtLoss(loss)})</span></span>`;
+                        setHtml(ref.chartLegend, online
+                            ? item('#3B82F6', '电信', ctStr, raw.ping_189) + item('#F59E0B', '联通', cuStr, raw.ping_10010) + item('#10B981', '移动', cmStr, raw.ping_10086)
+                            : '<span class="text-rose-500">离线</span>');
+                    } else {
+                        setHtml(ref.chartLegend, `
+                            <span class="inline-flex items-center gap-1 text-[#0EA5E9]"><span class="w-2 h-2 rounded-full bg-[#0EA5E9]"></span>下行 RX: <strong>${formatSpeed(cur.rx, false)}</strong></span>
+                            <span class="inline-flex items-center gap-1 text-[#10B981]"><span class="w-2 h-2 rounded-full bg-[#10B981]"></span>上行 TX: <strong>${formatSpeed(cur.tx, false)}</strong></span>
+                        `);
+                    }
+
+                    renderSmoothSplineCanvas(prefs.viewMode === 'table' ? ref.detailCanvas : ref.cardCanvas, id, st, now);
+                }
+            });
+
+            requestAnimationFrame(stepPhysicsLoop);
+        }
+
+        /* ==========================================================================
+           6. 曲线（Catmull-Rom 平滑 + 十字准线读数）
+           ========================================================================== */
+        function bindMagneticCrosshair(canvas) {
+            canvas.addEventListener('mousemove', (e) => {
+                canvasHoverX = e.clientX - canvas.getBoundingClientRect().left;
+            });
+            canvas.addEventListener('mouseleave', () => { canvasHoverX = null; });
+            canvas.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) canvasHoverX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+            }, { passive: true });
+            canvas.addEventListener('touchend', () => { canvasHoverX = null; });
+        }
+
+        function drawCatmullRomSpline(ctx, pts) {
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 1) { ctx.lineTo(pts[0].x + 0.01, pts[0].y); return; }
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = pts[i === 0 ? i : i - 1];
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+                ctx.bezierCurveTo(
+                    p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+                    p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+                    p2.x, p2.y);
+            }
         }
 
         // 三网历史每行 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1
-        function pingSeries(serverId) {
-            const d = p24.data;
-            if (!d) return null;
-            const ct = Array(d.slots).fill(null), cu = Array(d.slots).fill(null), cm = Array(d.slots).fill(null);
-            (d.nodes[serverId] || []).forEach(r => {
-                const i = Math.round((r[0] - d.start) / d.step);
-                if (i < 0 || i >= d.slots) return;
-                cu[i] = r[2] >= 0 ? r[2] : null;
-                ct[i] = r[4] >= 0 ? r[4] : null;
-                cm[i] = r[6] >= 0 ? r[6] : null;
-            });
-            return { ct, cu, cm, start: d.start, end: d.start + (d.slots - 1) * d.step };
+        function buildChartSeries(id, st) {
+            if (chartTab === 'ping') {
+                const d = p24.data;
+                if (!d) return { n: 0, labels: [], series: [] };
+                const n = d.slots;
+                const mk = () => Array(n).fill(null);
+                const ms = [mk(), mk(), mk()], loss = [mk(), mk(), mk()];
+                (d.nodes[id] || []).forEach(r => {
+                    const i = Math.round((r[0] - d.start) / d.step);
+                    if (i < 0 || i >= n) return;
+                    for (let k = 0; k < 3; k++) {
+                        if (r[2 + 2 * k] >= 0) ms[k][i] = r[2 + 2 * k];
+                        if (r[1 + 2 * k] >= 0) loss[k][i] = r[1 + 2 * k];
+                    }
+                });
+                const labels = Array.from({ length: n }, (_, i) => fmtHM(d.start + i * d.step));
+                return {
+                    n, labels, isPing: true,
+                    series: [
+                        { name: '电信', data: ms[1], loss: loss[1], color: '#3B82F6' },
+                        { name: '联通', data: ms[0], loss: loss[0], color: '#F59E0B' },
+                        { name: '移动', data: ms[2], loss: loss[2], color: '#10B981' }
+                    ]
+                };
+            }
+            const h = st.history;
+            const pad = Math.max(0, NET_POINTS - h.rx.length);
+            const fill = arr => Array(pad).fill(null).concat(arr);
+            return {
+                n: NET_POINTS, labels: fill(h.labels), isPing: false,
+                series: [
+                    { name: '下行', data: fill(h.rx), color: '#0EA5E9' },
+                    { name: '上行', data: fill(h.tx), color: '#10B981' }
+                ]
+            };
         }
 
-        function drawExpandedCanvas(serverId) {
-            const canvas = document.getElementById(`canvas-${serverId}`);
-            if (!canvas) return;
-
+        function renderSmoothSplineCanvas(canvas, id, st, nowMs) {
             const rect = canvas.parentElement.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 20) return;
+
             const dpr = window.devicePixelRatio || 1;
-            const width = Math.max(260, rect.width);
-            const height = Math.max(130, rect.height);
-
-            canvas.width = width * dpr;
-            canvas.height = height * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr);
-            ctx.clearRect(0, 0, width, height);
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(100, 116, 139, 0.14)';
-            const textColor = isDark ? '#64748b' : '#94a3b8';
-
-            const padL = 40, padR = 10, padT = 12, padB = 20;
-            const plotW = width - padL - padR;
-            const plotH = height - padT - padB;
-
-            let datasets, unit, labels, floor;
-            if (activeChartTab === 'ping') {
-                const p = pingSeries(serverId);
-                datasets = p ? [
-                    { data: p.ct, stroke: '#3b82f6', fill: null },
-                    { data: p.cu, stroke: '#f59e0b', fill: null },
-                    { data: p.cm, stroke: '#10b981', fill: null }
-                ] : [];
-                unit = 'ms';
-                floor = 60;
-                labels = p ? [fmtHM(p.start), fmtHM((p.start + p.end) / 2), fmtHM(p.end)] : ['', '', ''];
-            } else {
-                const h = netHistory[serverId] || { rx: [], tx: [] };
-                const pad = arr => Array(Math.max(0, NET_POINTS - arr.length)).fill(null).concat(arr);
-                datasets = [
-                    { data: pad(h.rx), stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.16)' },
-                    { data: pad(h.tx), stroke: '#0ea5e9', fill: 'rgba(14, 165, 233, 0.12)' }
-                ];
-                unit = 'MB/s';
-                floor = 1;
-                labels = [`-${(NET_POINTS - 1) * REFRESH_MS / 1000}s`, '', '现在'];
+            const w = rect.width;
+            const h = rect.height;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
             }
 
-            const values = datasets.flatMap(d => d.data).filter(v => v != null);
-            const maxVal = Math.max(...values, floor) * 1.18;
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, w, h);
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridStroke = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(15, 23, 42, 0.07)';
+            const axisText = isDark ? '#64748B' : '#94A3B8';
+            const padL = 42, padR = 14, padT = 12, padB = 20;
+            const plotW = w - padL - padR;
+            const plotH = h - padT - padB;
+
+            const { n, labels, series, isPing } = buildChartSeries(id, st);
+            const values = series.flatMap(s => s.data).filter(v => v != null);
+            const maxVal = Math.max(...values, isPing ? 50 : 131072) * 1.18;
+            const fmtVal = v => isPing ? `${Math.round(v)}` : formatSpeed(v, true);
 
             ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-            ctx.fillStyle = textColor;
-            ctx.strokeStyle = gridColor;
+            ctx.fillStyle = axisText;
+            ctx.strokeStyle = gridStroke;
             ctx.lineWidth = 1;
-
-            [0, 0.5, 1].forEach(ratio => {
-                const y = padT + plotH * ratio;
-                const v = maxVal * (1 - ratio);
+            [0, 0.5, 1].forEach(r => {
+                const y = padT + plotH * r;
                 ctx.beginPath();
                 ctx.setLineDash([3, 3]);
                 ctx.moveTo(padL, y);
-                ctx.lineTo(width - padR, y);
+                ctx.lineTo(w - padR, y);
                 ctx.stroke();
-                ctx.fillText(maxVal < 10 ? v.toFixed(1) : `${Math.round(v)}`, 2, y + 3);
+                ctx.fillText(fmtVal(maxVal * (1 - r)), 2, y + 3);
             });
             ctx.setLineDash([]);
-            ctx.fillText(unit, 2, height - 4);
-
-            ctx.textAlign = 'left';
-            ctx.fillText(labels[0], padL, height - 4);
-            ctx.textAlign = 'center';
-            ctx.fillText(labels[1], padL + plotW / 2, height - 4);
-            ctx.textAlign = 'right';
-            ctx.fillText(labels[2], width - padR, height - 4);
-            ctx.textAlign = 'left';
 
             if (!values.length) {
                 ctx.textAlign = 'center';
-                ctx.fillText(activeChartTab === 'ping' ? '暂无三网历史数据' : '等待数据…', padL + plotW / 2, padT + plotH / 2);
-                ctx.textAlign = 'left';
+                ctx.fillText(isPing ? (p24.data ? '暂无三网历史数据' : '正在加载三网历史…') : '等待数据…', padL + plotW / 2, padT + plotH / 2);
+                ctx.restore();
                 return;
             }
 
-            datasets.forEach(series => {
-                const n = series.data.length;
-                const stepX = plotW / Math.max(1, n - 1);
-                // 无数据的格子断开，分段绘制
+            const firstLabel = labels.find(Boolean) || '';
+            ctx.fillText(firstLabel, padL, h - 4);
+            ctx.textAlign = 'right';
+            ctx.fillText(labels[n - 1] || '', w - padR, h - 4);
+            ctx.textAlign = 'left';
+
+            const stepX = plotW / Math.max(1, n - 1);
+            const pulseRadius = 3 + Math.sin(nowMs / 180) * 1.3;
+
+            series.forEach(s => {
+                s.pts = s.data.map((val, idx) => val == null ? null : ({
+                    x: padL + idx * stepX,
+                    y: padT + plotH - (Math.min(maxVal, Math.max(0, val)) / maxVal) * plotH
+                }));
+                // 无数据的位置断开，分段绘制
                 const segments = [];
                 let seg = null;
-                series.data.forEach((v, i) => {
-                    if (v == null) { seg = null; return; }
+                s.pts.forEach(p => {
+                    if (!p) { seg = null; return; }
                     if (!seg) segments.push(seg = []);
-                    seg.push({ x: padL + i * stepX, y: padT + plotH - (Math.min(maxVal, v) / maxVal) * plotH });
+                    seg.push(p);
                 });
 
+                const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+                grad.addColorStop(0, s.color + '28');
+                grad.addColorStop(1, s.color + '00');
                 segments.forEach(pts => {
-                    if (series.fill) {
-                        ctx.beginPath();
-                        ctx.moveTo(pts[0].x, padT + plotH);
-                        pts.forEach(p => ctx.lineTo(p.x, p.y));
-                        ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
-                        ctx.closePath();
-                        ctx.fillStyle = series.fill;
-                        ctx.fill();
-                    }
                     ctx.beginPath();
-                    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-                    if (pts.length === 1) ctx.lineTo(pts[0].x + 0.01, pts[0].y);
-                    ctx.strokeStyle = series.stroke;
-                    ctx.lineWidth = 1.8;
-                    ctx.lineJoin = 'round';
+                    drawCatmullRomSpline(ctx, pts);
+                    ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
+                    ctx.lineTo(pts[0].x, padT + plotH);
+                    ctx.closePath();
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    drawCatmullRomSpline(ctx, pts);
+                    ctx.strokeStyle = s.color;
+                    ctx.lineWidth = 2;
                     ctx.lineCap = 'round';
                     ctx.stroke();
                 });
+
+                const lastSeg = segments[segments.length - 1];
+                if (lastSeg) {
+                    const lastPt = lastSeg[lastSeg.length - 1];
+                    ctx.beginPath();
+                    ctx.arc(lastPt.x, lastPt.y, pulseRadius + 2, 0, Math.PI * 2);
+                    ctx.fillStyle = s.color + '35';
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(lastPt.x, lastPt.y, 2.8, 0, Math.PI * 2);
+                    ctx.fillStyle = s.color;
+                    ctx.fill();
+                }
             });
+
+            // 十字准线与读数
+            if (canvasHoverX !== null && canvasHoverX >= padL && canvasHoverX <= w - padR) {
+                const snapIdx = Math.min(n - 1, Math.max(0, Math.round((canvasHoverX - padL) / stepX)));
+                const snapX = padL + snapIdx * stepX;
+
+                ctx.beginPath();
+                ctx.setLineDash([2, 2]);
+                ctx.moveTo(snapX, padT);
+                ctx.lineTo(snapX, padT + plotH);
+                ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.35)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                series.forEach(s => {
+                    const p = s.pts[snapIdx];
+                    if (!p) return;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = s.color;
+                    ctx.fill();
+                    ctx.strokeStyle = isDark ? '#090A0F' : '#FFFFFF';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+
+                const boxW = isPing ? 150 : 128;
+                const boxH = 20 + series.length * 15;
+                const boxX = snapX + 12 + boxW > w - padR ? snapX - boxW - 12 : snapX + 12;
+                const boxY = padT + 4;
+                ctx.fillStyle = isDark ? 'rgba(17, 19, 26, 0.92)' : 'rgba(255, 255, 255, 0.94)';
+                ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+                else ctx.rect(boxX, boxY, boxW, boxH);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
+                ctx.fillText(labels[snapIdx] || '-', boxX + 8, boxY + 13);
+                series.forEach((s, idx) => {
+                    const v = s.data[snapIdx];
+                    let vText = '-';
+                    if (v != null) {
+                        vText = isPing ? `${Math.round(v)} ms` : formatSpeed(v, false);
+                        if (isPing && s.loss[snapIdx] != null) vText += `  ${fmtLoss(s.loss[snapIdx])}`;
+                    }
+                    const yPos = boxY + 27 + idx * 15;
+                    ctx.fillStyle = s.color;
+                    ctx.fillText(`${s.name}:`, boxX + 8, yPos);
+                    ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
+                    ctx.fillText(vText, boxX + 46, yPos);
+                });
+            }
+
+            ctx.restore();
         }
 
+        /* ==========================================================================
+           7. 排序、筛选与滑块控件
+           ========================================================================== */
+        function getSortMetric(st, field) {
+            const raw = st.raw;
+            const tgt = st.target;
+            switch (field) {
+                case 'uptimeSec': return raw.uptimeSec;
+                case 'load1': return tgt.load1;
+                case 'speed': return tgt.rx + tgt.tx;
+                case 'traffic': return tgt.netIn + tgt.netOut;
+                case 'ping': {
+                    const v = [tgt.pingCT, tgt.pingCU, tgt.pingCM].filter(x => x > 0);
+                    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : (sortDir === 'desc' ? -1 : 99999);
+                }
+                case 'cpu': return tgt.cpu;
+                case 'mem': return tgt.memPct;
+                case 'hdd': return tgt.hddPct;
+                default: return raw.weight;
+            }
+        }
+
+        function cycleSort(field) {
+            if (sortField !== field) {
+                sortField = field;
+                sortDir = 'desc';
+            } else if (sortDir === 'desc') {
+                sortDir = 'asc';
+            } else {
+                sortField = null;
+                sortDir = 'desc';
+            }
+
+            ['uptimeSec', 'load1', 'speed', 'traffic', 'ping', 'cpu', 'mem', 'hdd'].forEach(f => {
+                const el = document.getElementById(`sort-${f}`);
+                if (!el) return;
+                if (sortField === f) {
+                    el.textContent = sortDir === 'desc' ? '↓' : '↑';
+                    el.className = 'text-[10px] text-emerald-500 font-bold opacity-100';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-[10px] opacity-40';
+                }
+            });
+
+            applySortAndFilterOrder();
+        }
+
+        function applySortAndFilterOrder() {
+            const sortedIds = [...serverOrder].sort((aId, bId) => {
+                const stA = nodeStates.get(aId);
+                const stB = nodeStates.get(bId);
+                if (!sortField) return stA.raw.weight - stB.raw.weight;
+                const valA = getSortMetric(stA, sortField);
+                const valB = getSortMetric(stB, sortField);
+                return (sortDir === 'desc' ? (valB - valA) : (valA - valB)) || (stA.raw.weight - stB.raw.weight);
+            });
+
+            const tbody = document.getElementById('serverTableBody');
+            const cardGrid = document.getElementById('cardViewWrapper');
+            const q = searchQuery.trim().toLowerCase();
+            let visibleCount = 0;
+
+            sortedIds.forEach((id, i) => {
+                const st = nodeStates.get(id);
+                const ref = domRefs.get(id);
+                if (!st || !ref) return;
+                const raw = st.raw;
+
+                let visible = true;
+                if (regionFilter === 'ALERT') visible = isNodeAlert(raw);
+                else if (regionFilter !== 'ALL') visible = raw.regionGroup === regionFilter;
+                if (visible && q) {
+                    const hay = `${raw.name} ${raw.location} ${raw.locationLabel} ${raw.type} ${raw.sys} ${raw.cpuInfo}`.toLowerCase();
+                    visible = hay.includes(q);
+                }
+                if (visible) visibleCount++;
+
+                // 只在顺序变化时移动节点，避免每次刷新都重排 DOM
+                if (tbody.children[i * 2] !== ref.trMain) {
+                    tbody.insertBefore(ref.trMain, tbody.children[i * 2] || null);
+                    tbody.insertBefore(ref.trDetail, ref.trMain.nextSibling);
+                }
+                if (cardGrid.children[i] !== ref.cardEl) cardGrid.insertBefore(ref.cardEl, cardGrid.children[i] || null);
+
+                ref.trMain.classList.toggle('hidden', !visible);
+                ref.trDetail.classList.toggle('hidden', !visible);
+                ref.cardEl.classList.toggle('hidden', !visible);
+            });
+
+            const empty = document.getElementById('emptyFilterState');
+            empty.classList.toggle('hidden', visibleCount > 0);
+            setText(document.getElementById('emptyFilterText'),
+                !loaded ? '正在加载节点数据…' : (nodeStates.size ? '未找到匹配的服务器节点' : '还没有节点接入'));
+            document.getElementById('emptyFilterBtn').classList.toggle('hidden', !loaded || !nodeStates.size);
+        }
+
+        function updateSlidingPill(trackId, thumbId, activeVal) {
+            const track = document.getElementById(trackId);
+            const thumb = document.getElementById(thumbId);
+            if (!track || !thumb) return;
+            const btn = track.querySelector(`button[data-val="${activeVal}"]`);
+            if (!btn) return;
+
+            track.querySelectorAll('button').forEach(b => {
+                const isAct = b === btn;
+                b.classList.toggle('text-slate-900', isAct);
+                b.classList.toggle('dark:text-white', isAct);
+                b.classList.toggle('text-slate-500', !isAct);
+                b.classList.toggle('dark:text-slate-400', !isAct);
+            });
+
+            thumb.style.width = `${btn.offsetWidth}px`;
+            thumb.style.transform = `translate3d(${btn.offsetLeft}px, 0, 0)`;
+        }
+
+        function syncAllSlidingPills() {
+            updateSlidingPill('segRegion', 'thumbRegion', regionFilter);
+            updateSlidingPill('segViewMode', 'thumbViewMode', prefs.viewMode);
+            updateSlidingPill('segBarMode', 'thumbBarMode', prefs.barMode);
+            updateSlidingPill('segSpeedUnit', 'thumbSpeedUnit', prefs.speedUnit);
+        }
+
+        function setRegionFilter(val) {
+            regionFilter = val;
+            updateSlidingPill('segRegion', 'thumbRegion', val);
+            applySortAndFilterOrder();
+        }
+
+        function setViewMode(mode) {
+            prefs.viewMode = mode;
+            localStorage.setItem('ss_viewMode', mode);
+            updateSlidingPill('segViewMode', 'thumbViewMode', mode);
+            document.getElementById('tableViewWrapper').classList.toggle('hidden', mode !== 'table');
+            document.getElementById('cardViewWrapper').classList.toggle('hidden', mode !== 'cards');
+        }
+
+        function setBarLabelMode(mode) {
+            prefs.barMode = mode;
+            localStorage.setItem('ss_barMode', mode);
+            updateSlidingPill('segBarMode', 'thumbBarMode', mode);
+        }
+
+        function setSpeedUnit(unit) {
+            prefs.speedUnit = unit;
+            localStorage.setItem('ss_speedUnit', unit);
+            updateSlidingPill('segSpeedUnit', 'thumbSpeedUnit', unit);
+        }
+
+        function handleSearchInput(val) {
+            searchQuery = val;
+            applySortAndFilterOrder();
+        }
+
+        function resetAllFilters() {
+            searchQuery = '';
+            document.getElementById('searchInput').value = '';
+            setRegionFilter('ALL');
+        }
+
+        function toggleExpandNode(id) {
+            const prevId = expandedId;
+            expandedId = (expandedId === id) ? null : id;
+            if (prevId) syncAccordionClass(prevId);
+            if (expandedId) syncAccordionClass(expandedId);
+        }
+
+        function switchChartTabMode(tab) {
+            chartTab = tab;
+            if (expandedId) syncAccordionClass(expandedId);
+        }
+
+        // 地区分组：数量为 0 的分组隐藏
+        function updateRegionCounts() {
+            const counts = { ALL: 0, '亚太': 0, '北美': 0, '欧洲': 0, '其他': 0, ALERT: 0 };
+            nodeStates.forEach(st => {
+                counts.ALL++;
+                counts[st.raw.regionGroup]++;
+                if (isNodeAlert(st.raw)) counts.ALERT++;
+            });
+            Object.keys(counts).forEach(k => {
+                setText(document.getElementById(`cnt-${k}`), String(counts[k]));
+                if (k !== 'ALL' && k !== 'ALERT') {
+                    document.querySelector(`#segRegion button[data-val="${k}"]`).classList.toggle('hidden', counts[k] === 0);
+                }
+            });
+            if (regionFilter !== 'ALL' && regionFilter !== 'ALERT' && counts[regionFilter] === 0) regionFilter = 'ALL';
+            requestAnimationFrame(() => updateSlidingPill('segRegion', 'thumbRegion', regionFilter));
+        }
+
+        function updateGlobalTargets(now) {
+            let total = 0, online = 0, ipv6 = 0, rxSum = 0, txSum = 0, trafficSum = 0;
+            nodeStates.forEach(st => {
+                total++;
+                if (isNodeOnline(st.raw)) {
+                    online++;
+                    rxSum += st.target.rx;
+                    txSum += st.target.tx;
+                }
+                if (st.raw.online6) ipv6++;
+                trafficSum += st.target.netIn + st.target.netOut;
+            });
+
+            globalPhysics.tgtRx = rxSum;
+            globalPhysics.tgtTx = txSum;
+            globalPhysics.tgtTraffic = trafficSum;
+
+            setText(document.getElementById('sumOnlineCount'), `${online} / ${total}`);
+            setText(document.getElementById('sumIpv6Count'), `${ipv6} IPv6`);
+            setText(document.getElementById('mobOnline'), `${online}/${total}`);
+            setText(document.getElementById('sumUpdatedClock'), formatTime(now).slice(11));
+        }
+
+        /* ==========================================================================
+           8. 定时拉取 json/stats.json
+           ========================================================================== */
         async function loadPing24h() {
             if (Date.now() - p24.at < 60000) return;
             p24.at = Date.now();
@@ -943,15 +1530,14 @@
                 const res = await fetch('json/ping24h.json', { cache: 'no-store' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 p24.data = await res.json();
-                if (expandedServerId && activeChartTab === 'ping') drawExpandedCanvas(expandedServerId);
             } catch (e) {
                 p24.at = 0;
             }
         }
 
-        async function tickUpdate() {
-            // 页面不可见时不刷新，节省流量
-            if (document.hidden || fetching) return;
+        async function executeDataTick() {
+            // 暂停或页面不可见时不刷新，节省流量
+            if (isStreamPaused || document.hidden || fetching) return;
             fetching = true;
             loadPing24h();
             try {
@@ -962,140 +1548,97 @@
                 if (data.version) {
                     if (!pageVersion) pageVersion = data.version;
                     else if (pageVersion !== data.version) setTimeout(() => location.reload(), 1000);
-                    document.getElementById('footerVersion').textContent = data.version;
+                    setText(document.getElementById('footerVersion'), data.version);
                 }
                 if (data.title) {
                     document.title = data.title;
-                    document.getElementById('brandTitle').textContent = data.title;
+                    setText(document.getElementById('brandTitle'), data.title);
                 }
-                ingestStats(Array.isArray(data.servers) ? data.servers : []);
                 loaded = true;
-                document.getElementById('footerTimestamp').textContent = formatTime(Number(data.updated)).slice(11);
-                setSyncState(syncRunning ? 'live' : 'paused');
+                initOrUpdateNodes(Array.isArray(data.servers) ? data.servers : [], Number(data.updated) || Date.now() / 1000);
+                if (!isStreamPaused) setStreamState('live');
             } catch (e) {
-                if (syncRunning) setSyncState('error');
+                if (!isStreamPaused) setStreamState('error');
             } finally {
                 fetching = false;
             }
-
-            updateHeaderSummary();
-            renderGroupPills();
-            renderMainView();
         }
 
-        function setSyncState(state) {
-            const dot = document.getElementById('syncDot');
-            const txt = document.getElementById('syncText');
-            const btn = document.getElementById('syncToggleBtn');
-            const base = 'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums border transition ';
+        function setStreamState(state) {
+            const ring = document.getElementById('streamBeaconRing');
+            const dot = document.getElementById('streamBeaconDot');
+            const lbl = document.getElementById('streamStatusLabel');
+            const btn = document.getElementById('streamToggleBtn');
+            const base = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tabular-nums border transition cursor-pointer ';
+            ring.classList.toggle('hidden', state === 'paused');
             if (state === 'live') {
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
-                txt.textContent = `${REFRESH_MS / 1000}s 实时同步`;
-                btn.className = base + 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15';
+                ring.className = 'beacon-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+                lbl.textContent = `${POLL_MS / 1000}s 实时`;
+                btn.className = base + 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20';
             } else if (state === 'paused') {
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
-                txt.textContent = '已暂停刷新';
-                btn.className = base + 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15';
+                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+                lbl.textContent = '已暂停';
+                btn.className = base + 'border-amber-500/30 bg-amber-500/10 text-amber-500';
             } else {
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 live-dot';
-                txt.textContent = '连接失败，重试中';
-                btn.className = base + 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/15';
+                ring.className = 'beacon-ring absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75';
+                dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-rose-500';
+                lbl.textContent = '连接失败，重试中';
+                btn.className = base + 'border-rose-500/30 bg-rose-500/10 text-rose-500';
             }
         }
 
-        function toggleExpandRow(serverId) {
-            expandedServerId = (expandedServerId === serverId) ? null : serverId;
-            renderMainView();
-        }
-
-        function switchChartTab(tab) {
-            activeChartTab = tab;
-            renderMainView();
-        }
-
-        function switchView(view) {
-            currentView = view;
-            localStorage.setItem('ss_view', view);
-            const activeCls = 'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white';
-            const inactiveCls = 'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200';
-            document.getElementById('btnViewTable').className = view === 'table' ? activeCls : inactiveCls;
-            document.getElementById('btnViewCards').className = view === 'cards' ? activeCls : inactiveCls;
-            renderMainView();
-        }
-
-        function selectGroup(group) {
-            currentGroup = group;
-            renderGroupPills();
-            renderMainView();
-        }
-
-        function handleSearch(val) {
-            searchQuery = val;
-            renderMainView();
-        }
-
-        function resetFilterState() {
-            currentGroup = 'ALL';
-            searchQuery = '';
-            document.getElementById('searchInput').value = '';
-            renderGroupPills();
-            renderMainView();
-        }
-
-        function toggleBarTextMode() {
-            barShowCapacity = !barShowCapacity;
-            localStorage.setItem('ss_cap', barShowCapacity ? '1' : '0');
-            document.getElementById('barTextModeLabel').textContent = barShowCapacity ? 'GB' : '%';
-            renderMainView();
-        }
-
-        function toggleSync() {
-            syncRunning = !syncRunning;
-            clearInterval(syncTimer);
-            if (syncRunning) {
-                setSyncState('live');
-                syncTimer = setInterval(tickUpdate, REFRESH_MS);
-                tickUpdate();
+        function toggleStreamPause() {
+            isStreamPaused = !isStreamPaused;
+            if (isStreamPaused) {
+                setStreamState('paused');
             } else {
-                setSyncState('paused');
+                setStreamState('live');
+                executeDataTick();
             }
         }
 
         function toggleTheme() {
-            const dark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('ss_theme', dark ? 'dark' : 'light');
-            if (expandedServerId) {
-                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
-            }
+            const isDark = document.documentElement.classList.toggle('dark');
+            prefs.theme = isDark ? 'dark' : 'light';
+            localStorage.setItem('ss_theme', prefs.theme);
         }
 
         window.addEventListener('resize', () => {
-            if (expandedServerId) {
-                requestAnimationFrame(() => drawExpandedCanvas(expandedServerId));
-            }
+            requestAnimationFrame(syncAllSlidingPills);
         });
 
         window.addEventListener('keydown', (e) => {
-            const search = document.getElementById('searchInput');
-            if (e.key === '/' && document.activeElement !== search) {
+            const searchEl = document.getElementById('searchInput');
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
                 e.preventDefault();
-                search.focus();
+                searchEl.focus();
             } else if (e.key === 'Escape') {
-                if (document.activeElement === search) search.blur();
-                else if (expandedServerId) toggleExpandRow(expandedServerId);
+                if (document.activeElement === searchEl) {
+                    if (searchEl.value) resetAllFilters();
+                    searchEl.blur();
+                } else if (expandedId) {
+                    toggleExpandNode(expandedId);
+                }
             }
         });
 
         // 切回标签页时立即刷新
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && syncRunning) tickUpdate();
+            if (!document.hidden) executeDataTick();
         });
 
-        switchView(currentView);
-        document.getElementById('barTextModeLabel').textContent = barShowCapacity ? 'GB' : '%';
-        renderMainView();
-        tickUpdate();
-        syncTimer = setInterval(tickUpdate, REFRESH_MS);
+        /* ==========================================================================
+           9. 启动
+           ========================================================================== */
+        setViewMode(prefs.viewMode);
+        applySortAndFilterOrder();
+        requestAnimationFrame(syncAllSlidingPills);
+        if (document.fonts) document.fonts.ready.then(syncAllSlidingPills);
+        lastFrameTime = performance.now();
+        requestAnimationFrame(stepPhysicsLoop);
+        executeDataTick();
+        pollTimer = setInterval(executeDataTick, POLL_MS);
     </script>
 </body>
 </html>
