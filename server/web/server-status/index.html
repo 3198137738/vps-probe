@@ -283,10 +283,6 @@
                                 <i class="bi bi-chevron-double-up"></i>
                             </span>
                         </span>
-                        <span class="node-cell-expand">
-                            <span class="node-cell-expand-label">版本:</span>
-                            @#node.host.Version#@
-                        </span>
                         <span class="node-echarts-expand">
                             <div class="chartbox" :id="`chart-${node.ID}`" chartbox-show="0" :key="node.ID" style="width: 100%; height: auto;"></div>
                         </span>
@@ -503,10 +499,6 @@
                                 <i class="bi bi-chevron-double-up"></i>
                             </span>
                         </span>
-                        <span class="node-cell-expand">
-                            <span class="node-cell-expand-label">版本:</span>
-                            @#node.host.Version#@
-                        </span>
                         <span class="node-echarts-expand">
                             <div class="chartbox" :id="`chart-${node.ID}`" chartbox-show="0" :key="node.ID" style="width: 100%; height: auto;"></div>
                         </span>
@@ -539,7 +531,7 @@
 
     </section>
     <footer class="container-fluid">
-        <p><span data-nz="brand">云监控</span> | Theme ServerStatus | Powered by <a target="_blank" href="https://github.com/naiba/nezha">哪吒监控</a> <span data-nz="version"></span></p>
+        <p><span data-nz="brand">云监控</span> | Theme ServerStatus | Powered by <a target="_blank" href="https://github.com/naiba/nezha">哪吒监控</a></p>
     </footer>
     <aside class="toolbox">
         <template v-if="showTools">
