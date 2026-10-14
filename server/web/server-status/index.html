@@ -1242,13 +1242,21 @@ nzBoot(function (nzInitServers) {
                         backgroundColor: tooltipBackgroundColor,
                         borderColor: tooltipBackgroundColor,
                         textStyle: { fontSize: fontSize, color: fontColor },
+                        padding: 0,
+                        extraCssText: 'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);',
+                        // 标题为完整时间，下方每条线路名称居左、延迟居右
                         formatter: params => {
-                            let html = `<span style="line-height:2em">${new Date(params[0].value[0]).toLocaleString()}</span><br>`;
+                            const d = new Date(params[0].value[0]);
+                            const pad = n => String(n).padStart(2, '0');
+                            const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                            const line = dark ? 'rgba(255,255,255,0.1)' : '#eeeeee';
+                            const head = dark ? 'rgba(255,255,255,0.05)' : '#f5f5f5';
+                            let html = `<div style="padding:8px 12px;border-bottom:1px solid ${line};background:${head};border-radius:8px 8px 0 0">${time}</div><div style="padding:6px 12px">`;
                             params.forEach(p => {
                                 const v = p.value[1];
-                                html += `<span style="line-height:2em">${p.marker} ${escape(p.seriesName)} ${v == null ? '丢包' : v.toFixed(2) + 'ms'}</span><br>`;
+                                html += `<div style="display:flex;justify-content:space-between;gap:28px;line-height:1.8em"><span style="color:${axisColor}">${escape(p.seriesName)}</span><span>${v == null ? '丢包' : v.toFixed(2) + 'ms'}</span></div>`;
                             });
-                            return html;
+                            return html + '</div>';
                         }
                     },
                     legend: {
@@ -1278,10 +1286,12 @@ nzBoot(function (nzInitServers) {
                     series: lines.map(l => ({
                         name: l.name,
                         type: 'line',
-                        symbol: 'none',
+                        symbol: 'circle',
+                        symbolSize: 7,
+                        showSymbol: false,
                         connectNulls: false,
                         emphasis: { disabled: true },
-                        lineStyle: { width: 1.2 },
+                        lineStyle: { width: 1 },
                         data: l.data
                     }))
                 });

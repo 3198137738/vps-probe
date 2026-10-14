@@ -362,10 +362,10 @@ class Pinger:
             return None
         s = socket.socket(addr[0], socket.SOCK_STREAM)
         s.settimeout(timeout)
-        t = time.time()
+        t = time.perf_counter()
         try:
             s.connect(addr[4])
-            return int((time.time() - t) * 1000)
+            return round((time.perf_counter() - t) * 1000, 2)
         except Exception:
             return None
         finally:
@@ -393,8 +393,8 @@ class Pinger:
             return [-1, 0]
         ok = [x for x in q if x is not None]
         loss = round((len(q) - len(ok)) * 100 / len(q))
-        recent = ok[-3:]
-        ms = round(sum(recent) / len(recent)) if recent else -1
+        # 上报最近一次成功探测的延迟（保留两位小数），主控按 1 分钟一格记录，曲线能看到每次波动
+        ms = ok[-1] if ok else -1
         return [ms, loss]
 
 

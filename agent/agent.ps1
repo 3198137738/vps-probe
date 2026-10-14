@@ -90,7 +90,7 @@ function Test-TcpMs([string]$target, [int]$timeoutMs) {
         $c = New-Object Net.Sockets.TcpClient($ip.AddressFamily)
         $sw = [Diagnostics.Stopwatch]::StartNew()
         $t = $c.ConnectAsync($ip, $p)
-        if ($t.Wait($timeoutMs) -and $c.Connected) { return [int]$sw.ElapsedMilliseconds }
+        if ($t.Wait($timeoutMs) -and $c.Connected) { return [Math]::Round($sw.Elapsed.TotalMilliseconds, 2) }
         return -1
     } catch {
         return -1
@@ -233,7 +233,7 @@ function Invoke-PingStep {
         if ($script:PingNext.ContainsKey($k) -and $script:PingNext[$k] -gt $now) { continue }
         $script:PingNext[$k] = $now.AddSeconds($script:PingInterval)
         $ms = Test-TcpMs $script:PingTargets[$k] 1000
-        if (-not $script:PingData.ContainsKey($k)) { $script:PingData[$k] = New-Object 'System.Collections.Generic.List[int]' }
+        if (-not $script:PingData.ContainsKey($k)) { $script:PingData[$k] = New-Object 'System.Collections.Generic.List[double]' }
         $l = $script:PingData[$k]
         $l.Add($ms)
         while ($l.Count -gt $script:PingWindow) { $l.RemoveAt(0) }
@@ -248,8 +248,8 @@ function Get-PingResult([string]$k) {
     $ok = @($l | Where-Object { $_ -ge 0 })
     $loss = [int][Math]::Round(($l.Count - $ok.Count) * 100 / $l.Count)
     if ($ok.Count -eq 0) { return @(-1, $loss) }
-    $avg = ($ok | Select-Object -Last 3 | Measure-Object -Average).Average
-    return @([int][Math]::Round($avg), $loss)
+    # 上报最近一次成功探测的延迟（保留两位小数），主控按 1 分钟一格记录，曲线能看到每次波动
+    return @($ok[-1], $loss)
 }
 
 # ---------------------------------------------------------------- 上报数据

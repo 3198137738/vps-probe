@@ -66,8 +66,8 @@ NODES_FILE = os.path.join(DATA_DIR, "nodes.json")
 REMOVED_FILE = os.path.join(DATA_DIR, "removed.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 
-PING_STEP = 300    # 三网 24 小时延迟历史：每 5 分钟一格，共 288 格
-PING_SLOTS = 288
+PING_STEP = 60     # 三网 24 小时延迟历史：每 1 分钟一格（与探测间隔一致），共 1440 格；旧的 5 分钟格数据 24 小时内自然淘汰
+PING_SLOTS = 1440
 VERSION_FILE = os.path.join(BASE_DIR, ".version")
 
 DEFAULT_CONFIG = {
@@ -280,13 +280,13 @@ class Store:
         """把一格的累计值换算为 [格起始时间, 联通丢包%, 联通延迟ms, 电信.., .., 移动.., ..]，无数据为 -1"""
         row = [cur[0]]
         for a in cur[1:]:
-            row += [round(a[0] / a[1], 1) if a[1] else -1, round(a[2] / a[3]) if a[3] else -1]
+            row += [round(a[0] / a[1], 1) if a[1] else -1, round(a[2] / a[3], 2) if a[3] else -1]
         return row
 
     def record(self, nid, d, now):
         """
         记录三网历史（调用方需持有锁）。客户端每次上报带有最近一个探测窗口的 [延迟, 丢包率]，
-        按 5 分钟一格取平均，节点无需改动
+        按 1 分钟一格取平均，节点无需改动
         """
         if len(d) < 24:
             return
